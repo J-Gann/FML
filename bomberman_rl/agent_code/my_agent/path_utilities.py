@@ -50,7 +50,7 @@ def print_field(field):
         for x in range(s.ROWS):
             if field[x,y] == -1: print(" XXX ",end="")
             else: 
-                node = _index_to_node(x,y)
+                node = _index_to_node((x,y))
                 numb = ""
                 if node < 10: numb = "00" + str(node)
                 elif node < 100: numb = "0" + str(node)
@@ -63,7 +63,7 @@ def print_field(field):
     print("")
 
 def move_to_nearest_coin(self, agent, coins):
-    coin_nodes = [_index_to_node(coin[0], coin[1]) for coin in coins]
+    coin_nodes = [_index_to_node(coin) for coin in coins]
     agent_node = _index_to_node(agent)
     return _move_to_nearest_coin(self.dist_matrix, self.predecessors_matrix, agent_node, coin_nodes)
 
@@ -71,17 +71,17 @@ def _move_to_nearest_coin(dist_matrix, predecessors_matrix, agent_node, coin_nod
     distances = [dist_matrix[agent_node, coin] for coin in coin_nodes]
     nearest_coin = coin_nodes[np.argmin(distances)]
     shortest_path = _traverse_shortest_path(predecessors_matrix, agent_node, nearest_coin)
-    if len(shortest_path) == 0: return Actions.WAIT
+    if len(shortest_path) == 0: return Actions.WAIT.name
 
     next_node = shortest_path[1]
 
     cx, cy = _node_to_index(next_node)
     ax, ay = _node_to_index(agent_node)
 
-    if cx - ax > 0: return Actions.RIGHT
-    elif cx - ax < 0: return Actions.LEFT
-    elif cy - ay > 0: return Actions.DOWN
-    elif cy - ay < 0: return Actions.UP
+    if cx - ax > 0: return Actions.RIGHT.name
+    elif cx - ax < 0: return Actions.LEFT.name
+    elif cy - ay > 0: return Actions.DOWN.name
+    elif cy - ay < 0: return Actions.UP.name
 
 def _create_graph(field):    
     # Fields are connected to at most 4 other fields, therefore the matrix is sparse.
@@ -96,8 +96,8 @@ def _create_graph(field):
             for nx, ny in neighbors:
                 # Test if the neighbor node exists
                 if 0 <= nx < s.COLS and 0 <= ny < s.ROWS:
-                    node = _index_to_node(x, y)
-                    neighbor = _index_to_node(nx, ny)
+                    node = _index_to_node((x, y))
+                    neighbor = _index_to_node((nx, ny))
                     row.append(node)
                     col.append(neighbor)
                     # Insert an edge between node and neighbor if neither node nor neighbor is a wall
@@ -125,8 +125,8 @@ def _traverse_shortest_path(predecessors_matrix, source, target):
     path.append(target)
     return path
 
-def _index_to_node(x, y):
-    return y * s.COLS + x
+def _index_to_node(index):
+    return index[1] * s.COLS + index[0]
 
 def _node_to_index(node):
     x = node % s.COLS 
