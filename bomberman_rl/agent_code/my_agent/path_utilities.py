@@ -19,9 +19,11 @@ def setup_graph_features(self, field, load=True, save=False):
         bomberman_graph_file = open('./data/bomberman_graph', 'rb')
         self.graph = pickle.load(bomberman_graph_file)
         bomberman_graph_file.close()
+
         bomberman_dist_matrix_file = open('./data/bomberman_dist_matrix', 'rb')
         self.dist_matrix = pickle.load(bomberman_dist_matrix_file)
         bomberman_dist_matrix_file.close()
+
         bomberman_predecessors_matrix_file = open('./data/bomberman_predecessors_matrix', 'rb')
         self.predecessors_matrix = pickle.load(bomberman_predecessors_matrix_file)
         bomberman_predecessors_matrix_file.close()
@@ -32,9 +34,11 @@ def setup_graph_features(self, field, load=True, save=False):
         bomberman_graph_file = open('./data/bomberman_graph', 'wb')
         pickle.dump(self.graph, bomberman_graph_file)
         bomberman_graph_file.close()
+
         bomberman_dist_matrix_file = open('./data/bomberman_dist_matrix', 'wb')
         pickle.dump(self.dist_matrix, bomberman_dist_matrix_file)
         bomberman_dist_matrix_file.close()
+        
         bomberman_predecessors_matrix_file = open('./data/bomberman_predecessors_matrix', 'wb')
         pickle.dump(self.predecessors_matrix, bomberman_predecessors_matrix_file)
         bomberman_predecessors_matrix_file.close()

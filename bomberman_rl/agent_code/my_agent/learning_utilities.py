@@ -1,11 +1,37 @@
 from sklearn import tree
 from .path_utilities import move_to_nearest_coin
 import events as e
+import pickle
 
 def setup_learning_features(self, load=True, save=True):
-    self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    if load:
+        old_features_file = open('./data/old_features', 'rb')
+        self.old_features = pickle.load(old_features_file)
+        old_features_file.close()
+
+        new_features_file = open('./data/new_features', 'rb')
+        self.new_features = pickle.load(new_features_file)
+        new_features_file.close()
+
+        rewards_file = open('./data/rewards', 'rb')
+        self.rewards = pickle.load(rewards_file)
+        rewards_file.close()
+    else:
+        if not hasattr(self, "old_features"): self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+        if not hasattr(self, "new_features"): self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+        if not hasattr(self, "rewards"): self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    if save:
+        old_features_file = open('./data/old_features', 'wb')
+        pickle.dump(self.old_features, old_features_file)
+        old_features_file.close()
+
+        new_features_file = open('./data/new_features', 'wb')
+        pickle.dump(self.new_features, new_features_file)
+        new_features_file.close()
+
+        rewards_file = open('./data/rewards', 'wb')
+        pickle.dump(self.rewards, rewards_file)
+        rewards_file.close()
 
 def update_transitions(self, old_game_state, self_action, new_game_state, events):
     old_features = features_from_game_state(self, old_game_state, self_action)
