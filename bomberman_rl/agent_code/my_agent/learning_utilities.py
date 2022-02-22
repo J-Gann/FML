@@ -6,6 +6,7 @@ import pickle
 from enum import Enum
 from sklearn import tree
 import numpy as np
+from joblib import dump, load
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.5
@@ -18,19 +19,21 @@ class Actions(Enum):
     WAIT = 4 
     BOMB = 5
 
-def setup_learning_features(self):
+def setup_learning_features(self, loadModel=False):
     if not hasattr(self, "old_features"): self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
     if not hasattr(self, "new_features"): self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
     if not hasattr(self, "rewards"): self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    self.trees = {
-        "UP": tree.DecisionTreeRegressor(),
-        "DOWN": tree.DecisionTreeRegressor(),
-        "LEFT": tree.DecisionTreeRegressor(),
-        "RIGHT": tree.DecisionTreeRegressor(),
-        "WAIT": tree.DecisionTreeRegressor(),
-        "BOMB": tree.DecisionTreeRegressor()
-    }
-    for action_tree in self.trees: self.trees[action_tree].fit([[0]], [0])
+    if loadModel: self.trees = load("models.joblib")
+    else:
+        self.trees = {
+            "UP": tree.DecisionTreeRegressor(),
+            "DOWN": tree.DecisionTreeRegressor(),
+            "LEFT": tree.DecisionTreeRegressor(),
+            "RIGHT": tree.DecisionTreeRegressor(),
+            "WAIT": tree.DecisionTreeRegressor(),
+            "BOMB": tree.DecisionTreeRegressor()
+        }
+        for action_tree in self.trees: self.trees[action_tree].fit([[0]], [0])
 
 def update_transitions(self, old_game_state, self_action, new_game_state, events):
     old_features = features_from_game_state(self, old_game_state, self_action)
@@ -40,8 +43,9 @@ def update_transitions(self, old_game_state, self_action, new_game_state, events
     self.new_features[self_action].append(new_features)
     self.rewards[self_action].append(rewards)
 
-def train_q_model(self):
+def train_q_model(self, saveModel=False):
     self.trees = _train_q_model(self.new_features, self.old_features, self.rewards, self.trees)
+    if saveModel: dump(self.trees, "models.joblib")
 
 def _train_q_model(new_features, old_features, rewards, trees):
     new_trees = {}
@@ -67,6 +71,7 @@ def _train_q_model(new_features, old_features, rewards, trees):
     return new_trees
 
 def features_from_game_state(self, game_state, self_action):
+    if len(game_state["coins"]) == 0: return [0]
     move = move_to_nearest_coin(self, game_state["self"][3], game_state["coins"])
     if move == self_action: return np.array([1])
     else: return np.array([0])

@@ -5,6 +5,7 @@ from .path_utilities import setup_graph_features, print_field, _traverse_shortes
 from .learning_utilities import setup_learning_features, update_transitions, train_q_model
 from enum import Enum
 from sklearn.tree import export_graphviz
+from joblib import dump, load
 
 EXPLOITATION_RATE = 0.01
 
@@ -20,7 +21,7 @@ def setup_training(self):
     # Set probability of exploration actions to 1
     self.exploration_probability = 1
     setup_graph_features(self, None, load=True, save=False) # Use this to setup the graph features by loading precomputed graph data from the filesystem
-    setup_learning_features(self)
+    setup_learning_features(self, True)
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
@@ -35,11 +36,11 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     #print(_traverse_shortest_path(self.predecessors_matrix, 270, 234))
     #print(_move_to_nearest_coin(self.dist_matrix, self.predecessors_matrix, 270, [234]))
     #print(self.new_features["UP"])
-    if last_game_state["round"] == 5:
-        train_q_model(self)
+    if last_game_state["round"] == 1000:
+        train_q_model(self, True)
         for action in Actions:
             export_graphviz(
                 self.trees[action.name],
-                out_file=action.name+".dot",
+                out_file="./trees/"+action.name+".dot",
                 feature_names=["actionToNearestCoin"]
             )
