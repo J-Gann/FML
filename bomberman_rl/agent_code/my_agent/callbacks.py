@@ -1,0 +1,18 @@
+import numpy as np
+
+def setup(self):
+    # Initialize to force exploitation. This gets overwritten by the training setup to 1 in case of a training session
+    self.exploration_probability = 0
+
+def act(self, game_state: dict):
+    # Exploit or explore according to the exploration probability
+    if np.random.randint(0, 1) < self.exploration_probability: return explore(self)
+    else: return exploit(self)
+
+
+def explore(self):
+    return np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT'])
+
+def exploit(self):
+    return np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT']) #TODO: Use prediction
+
