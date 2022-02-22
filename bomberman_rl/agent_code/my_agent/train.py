@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np
 import settings as s
-from .path_utilities import setup_graph_features
+from .path_utilities import setup_graph_features, print_field, _traverse_shortest_path, _move_to_nearest_coin
 from .learning_utilities import setup_learning_features, update_transitions
 from enum import Enum
 
@@ -31,4 +31,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if self.exploration_probability - EXPLOITATION_RATE < 0: self.exploration_probability = 0
     else: self.exploration_probability -= EXPLOITATION_RATE
     setup_learning_features(self, load=False, save=True)
-
+    #print_field(last_game_state["field"])
+    #print(_traverse_shortest_path(self.predecessors_matrix, 270, 234))
+    #print(_move_to_nearest_coin(self.dist_matrix, self.predecessors_matrix, 270, [234]))
+    #print(self.new_features["UP"])
