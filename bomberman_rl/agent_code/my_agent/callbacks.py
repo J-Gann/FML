@@ -6,13 +6,14 @@ def setup(self):
 
 def act(self, game_state: dict):
     # Exploit or explore according to the exploration probability
-    if np.random.randint(0, 1) < self.exploration_probability: return explore(self)
-    else: return exploit(self)
+    if np.random.randint(0, 1) < self.exploration_probability: return explore(self, game_state)
+    else: return exploit(self, game_state)
 
 
-def explore(self):
+def explore(self, game_state):
     return np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT'])
 
-def exploit(self):
+def exploit(self, game_state):
+
     return np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT']) #TODO: Use prediction
 
