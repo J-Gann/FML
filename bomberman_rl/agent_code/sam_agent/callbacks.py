@@ -36,35 +36,10 @@ def setup(self):
 
 
 def act(self, game_state: dict) -> str:
-    round = game_state["round"]
-    step = game_state["step"]
     name, points, alive, position = game_state["self"]
 
     if not alive:
         return Actions.WAIT
-
-    position = np.array(position)
-
-    field = game_state["field"]
-    nearest_crates = k_closest(position, crate_positions(field), k=3)
-    crates_direction = nearest_crates - position
-
-    others = game_state["others"]
-    others_positions = np.array([other[3] for other in others])
-    others_directions = others_positions - position
-
-    bombs = game_state["bombs"]
-    close_bombs = bomb_vector(position, bombs)
-    bomb_direction = close_bombs - position
-
-    coins = np.array(game_state["coins"])
-    closest_coins = k_closest(position, coins, k=3)
-    coin_directions = closest_coins - position
-
-    explosion_map = game_state["explosion_map"].T
-    explosion_positions = positions[explosion_map == 1]
-    explosion_positions = k_closest(position, explosion_positions, k=4)
-    explosion_direction = explosion_positions - position
 
     return Actions.WAIT
 
@@ -73,9 +48,6 @@ def state_to_features(game_state: dict):
     round = game_state["round"]
     step = game_state["step"]
     name, points, alive, position = game_state["self"]
-
-    if not alive:
-        return Actions.WAIT
 
     position = np.array(position)
 
@@ -109,7 +81,6 @@ def state_to_features(game_state: dict):
             explosion_direction.flatten(),
         ]
     )
-    return
 
 
 def bomb_vector(position, bombs):
