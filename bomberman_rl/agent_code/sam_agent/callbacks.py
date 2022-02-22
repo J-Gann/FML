@@ -45,10 +45,7 @@ def setup(self):
 
 
 def act(self, game_state: dict) -> str:
-    name, points, alive, position = game_state["self"]
-
-    if not alive:
-        return Actions.WAIT
+    name, points, bomb_possible, position = game_state["self"]
 
     print(state_to_features(game_state).shape)
 
@@ -58,7 +55,7 @@ def act(self, game_state: dict) -> str:
 def state_to_features(game_state: dict):
     round = game_state["round"]
     step = game_state["step"]
-    name, points, alive, position = game_state["self"]
+    name, points, bomb_possible, position = game_state["self"]
 
     position = np.array(position)
 
@@ -68,7 +65,7 @@ def state_to_features(game_state: dict):
 
     x, y = position
     # indicates whether top, left, down, right there is a wall next to agent
-    walls = np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1
+    walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
 
     others = game_state["others"]
     others_positions = np.array([other[3] for other in others])
@@ -97,6 +94,7 @@ def state_to_features(game_state: dict):
             coin_directions.flatten(),
             bomb_direction.flatten(),
             explosion_direction.flatten(),
+            int(bomb_possible),
         ]
     )
 
