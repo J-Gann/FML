@@ -53,50 +53,67 @@ def act(self, game_state: dict) -> str:
 
 
 def state_to_features(game_state: dict):
-    round = game_state["round"]
-    step = game_state["step"]
-    name, points, bomb_possible, position = game_state["self"]
+    *_, bomb_possible, position = game_state["self"]
+    field = game_state["field"]
+    others = game_state["others"]
+    bombs = game_state["bombs"]
+    coins = np.array(game_state["coins"])
+    explosion_map = game_state["explosion_map"].T
 
     position = np.array(position)
-
-    field = game_state["field"]
-    nearest_crates = k_closest(position, crate_positions(field), k=K_NEAREST_CRATES)
-    crates_direction = nearest_crates - position
-
-    x, y = position
-    # indicates whether top, left, down, right there is a wall next to agent
-    walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
-
-    others = game_state["others"]
-    others_positions = np.array([other[3] for other in others])
-    others_positions = pad_matrix(others_positions, 3)
-    others_directions = others_positions - position
-
-    bombs = game_state["bombs"]
-    close_bombs = bomb_vector(position, bombs)
-    bomb_direction = close_bombs - position
-
-    coins = np.array(game_state["coins"])
-    closest_coins = k_closest(position, coins, k=K_NEAREST_COINS)
-    coin_directions = closest_coins - position
-
-    explosion_map = game_state["explosion_map"].T
-    explosion_positions = positions[explosion_map == 1]
-    explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
-    explosion_direction = explosion_positions - position
+    bomb_possible = np.array([int(bomb_possible)])
 
     return np.concatenate(
         [
-            position,
-            walls,
-            others_directions.flatten(),
-            crates_direction.flatten(),
-            coin_directions.flatten(),
-            bomb_direction.flatten(),
-            explosion_direction.flatten(),
-            int(bomb_possible),
+            position.flatten(),
+            walls(position, field).flatten(),
+            others_direction(position, others).flatten(),
+            crates_direction(position, field).flatten(),
+            coin_directions(position, coins).flatten(),
+            bomb_directions(position, bombs).flatten(),
+            explosion_direction(position, explosion_map).flatten(),
+            bomb_possible,
         ]
     )
+
+
+def explosion_direction(position, explosion_map):
+    explosion_positions = positions[explosion_map == 1]
+    explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
+    explosion_direction = explosion_positions - position
+    return explosion_direction
+
+
+def coin_directions(position, coins):
+    closest_coins = k_closest(position, coins, k=K_NEAREST_COINS)
+    coin_directions = closest_coins - position
+    return coin_directions
+
+
+def bomb_directions(position, bombs):
+    close_bombs = bomb_vector(position, bombs)
+    bomb_direction = close_bombs - position
+    return bomb_direction
+
+
+def others_direction(position, others):
+    others_positions = np.array([other[3] for other in others])
+    others_positions = pad_matrix(others_positions, 3)
+    others_directions = others_positions - position
+    return others_directions
+
+
+def walls(position, field):
+    x, y = position
+    # indicates whether top, left, down, right there is a wall next to agent
+    walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
+    return walls
+
+
+def crates_direction(position, field):
+    nearest_crates = k_closest(position, crate_positions(field), k=K_NEAREST_CRATES)
+    crates_direction = nearest_crates - position
+    return crates_direction
 
 
 def bomb_vector(position, bombs):
