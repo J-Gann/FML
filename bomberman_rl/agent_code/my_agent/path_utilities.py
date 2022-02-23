@@ -5,6 +5,7 @@ from scipy.sparse.csgraph import shortest_path
 import pickle
 import numpy as np
 from enum import Enum
+import os
 
 class Actions(Enum):
     UP = 0
@@ -15,7 +16,7 @@ class Actions(Enum):
     BOMB = 5
 
 def setup_graph_features(self, field, load=True, save=False):
-    if load:
+    if load and os.path.isfile("./data/bomberman_graph") and os.path.isfile("./data/bomberman_dist_matrix") and os.path.isfile("./data/bomberman_predecessors_matrix"):
         bomberman_graph_file = open('./data/bomberman_graph', 'rb')
         self.graph = pickle.load(bomberman_graph_file)
         bomberman_graph_file.close()
@@ -27,9 +28,15 @@ def setup_graph_features(self, field, load=True, save=False):
         bomberman_predecessors_matrix_file = open('./data/bomberman_predecessors_matrix', 'rb')
         self.predecessors_matrix = pickle.load(bomberman_predecessors_matrix_file)
         bomberman_predecessors_matrix_file.close()
+    elif load:
+        print("[Warn] Cannot load precomputed path data. Recomputing ...")
+        self.graph = _create_graph(field)
+        self.dist_matrix, self.predecessors_matrix = _shortest_paths(self.graph)
     else:
         self.graph = _create_graph(field)
         self.dist_matrix, self.predecessors_matrix = _shortest_paths(self.graph)
+
+
     if save:
         bomberman_graph_file = open('./data/bomberman_graph', 'wb')
         pickle.dump(self.graph, bomberman_graph_file)
@@ -105,7 +112,7 @@ def _create_graph(field):
                     row.append(node)
                     col.append(neighbor)
                     # Insert an edge between node and neighbor if neither node nor neighbor is a wall
-                    if field[nx, ny] >= 0 and field [x, y] >= 0: data.append(1)
+                    if field[nx, ny] >= 0 and field[x, y] >= 0: data.append(1)
                     # If either node or neighbor is a wall, set edge weight to infinity => shortest path algorithms wont use that
                     # edge, e.g wont move to the field with the wall 
                     else: data.append(math.inf)
