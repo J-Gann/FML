@@ -1,9 +1,9 @@
 digraph Tree {
 node [shape=box, fontname="helvetica"] ;
 edge [fontname="helvetica"] ;
-0 [label="actionToNearestCoin <= 0.5\nsquared_error = 0.011\nsamples = 79709\nvalue = 0.024"] ;
-1 [label="squared_error = 0.001\nsamples = 60437\nvalue = 0.003"] ;
+0 [label="actionToNearestCoin <= 0.5\nsquared_error = 0.194\nsamples = 2\nvalue = 1.158"] ;
+1 [label="squared_error = 0.0\nsamples = 1\nvalue = 0.717"] ;
 0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
-2 [label="squared_error = 0.037\nsamples = 19272\nvalue = 0.091"] ;
+2 [label="squared_error = -0.0\nsamples = 1\nvalue = 1.599"] ;
 0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
 }

@@ -7,7 +7,7 @@ from enum import Enum
 from sklearn.tree import export_graphviz
 from joblib import dump, load
 
-EXPLOITATION_RATE = 0.01
+EXPLOITATION_RATE = 0.001
 
 class Actions(Enum):
     UP = 0
@@ -35,8 +35,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     #print(_traverse_shortest_path(self.predecessors_matrix, 270, 234))
     #print(_move_to_nearest_coin(self.dist_matrix, self.predecessors_matrix, 270, [234]))
     #print(self.new_features["UP"])
-    if last_game_state["round"] == 1000:
-        train_q_model(self, True)
+    if last_game_state["round"] % 100 == 0:
+        print(self.action_value_data["UP"], last_game_state["self"][1], self.exploration_probability)
+        train_q_model(self, False)
         for action in Actions:
             export_graphviz(
                 self.trees[action.name],

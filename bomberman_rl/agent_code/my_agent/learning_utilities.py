@@ -12,6 +12,21 @@ import os
 DISCOUNT = 0.95
 LEARNING_RATE = 0.5
 
+# Learning model:
+# ---------------
+# 1) Initially fit action_value_models to 0
+# 2) For each episode (f.e. 100 rounds):
+#   3) In each step: update action_value_data for the state and action pair and store it in a dictionary throughout all episodes (use existing predictions of action_value_models)
+#   4) After each episode: Fit action_value_models using (updated) action_value_data
+
+# Notes:
+# ------
+# Datastructure action_value_data:
+action_value_data = { "UP": {tuple(np.array([0,0,1])): 100}, "DOWN": {}, "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {} }
+
+
+# ########################################################################################
+
 class Actions(Enum):
     UP = 0
     RIGHT = 1
@@ -21,9 +36,10 @@ class Actions(Enum):
     BOMB = 5
 
 def setup_learning_features(self, load_model=False):
-    self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    # self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    # self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    # self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+    self.action_value_data = { "UP": {}, "DOWN": {}, "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {} }
 
     if load_model and os.path.isfile("models.joblib"): self.trees = load("models.joblib")
     elif load_model:
@@ -49,38 +65,55 @@ def setup_learning_features(self, load_model=False):
         for action_tree in self.trees: self.trees[action_tree].fit([[0]], [0])
 
 def update_transitions(self, old_game_state, self_action, new_game_state, events):
-    old_features = features_from_game_state(self, old_game_state, self_action)
-    new_features = features_from_game_state(self, new_game_state, self_action)
+    # Store transitions (not the optimal solution, TODO: delete this later)
+    # old_features = features_from_game_state(self, old_game_state, self_action)
+    # new_features = features_from_game_state(self, new_game_state, self_action)
+    # rewards = _rewards_from_events(events)
+    # self.old_features[self_action].append(old_features)
+    # self.new_features[self_action].append(new_features)
+    # self.rewards[self_action].append(rewards)
+
+    # Calculate new action_value for the old_game_state
+    update_action_value_data(self, old_game_state, self_action, new_game_state, events)
+
+def _action_value_data(trees, old_features, self_action, new_features, rewards):
+    current_guess = trees[self_action].predict(old_features.reshape(-1, 1))
+    predicted_future_reward = np.max([trees[action_tree].predict(new_features.reshape(-1, 1)) for action_tree in trees])
+    predicted_action_value = trees[self_action].predict(old_features.reshape(-1, 1))
+    q_value = current_guess + LEARNING_RATE * ( rewards + DISCOUNT * predicted_future_reward - predicted_action_value)
+    return q_value
+
+def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
+    old_features = np.array(features_from_game_state(self, old_game_state, self_action))
+    new_features = np.array(features_from_game_state(self, new_game_state, self_action))
     rewards = _rewards_from_events(events)
-    self.old_features[self_action].append(old_features)
-    self.new_features[self_action].append(new_features)
-    self.rewards[self_action].append(rewards)
+    q_value = _action_value_data(self.trees, old_features, self_action, new_features, rewards)
+    self.action_value_data[self_action][tuple(old_features)] = q_value
 
 def train_q_model(self, saveModel=False):
-    self.trees = _train_q_model(self.new_features, self.old_features, self.rewards, self.trees)
+    self.trees = _train_q_model(self.action_value_data)
     if saveModel: dump(self.trees, "models.joblib")
 
-def _train_q_model(new_features, old_features, rewards, trees):
+def _train_q_model(action_value_data):
     new_trees = {}
     for action in Actions:
         action = action.name
-        old_features_action = np.array(old_features[action])
-        new_features_action = np.array(new_features[action])
-        rewards_action = np.array(rewards[action])
-        if old_features_action.shape[0] == 0 or new_features_action.shape[0] == 0 or rewards_action.shape[0] == 0:
-            new_trees[action] = trees[action]
 
-        else:
-            current_guess = trees[action].predict(old_features_action.reshape(-1, 1))
-            predicted_future_reward = np.max([trees[action_tree].predict(new_features_action.reshape(-1, 1)) for action_tree in trees])
-            predicted_action_value = trees[action].predict(old_features_action.reshape(-1, 1))
+        action_value_data_action = action_value_data[action]
 
-            q_values = current_guess + LEARNING_RATE * ( rewards_action + DISCOUNT * predicted_future_reward - predicted_action_value)
+        features = []
+        values = []
 
-            new_tree = tree.DecisionTreeRegressor()
-            new_tree.fit(old_features_action, q_values)
-            new_trees[action] = new_tree
-        
+        for key in action_value_data_action:
+            feature = np.array(key)
+            value = action_value_data_action[key]
+            features.append(feature)
+            values.append(value)
+            
+        new_tree = tree.DecisionTreeRegressor()
+        new_tree.fit(np.array(features).reshape(-1, 1), np.array(values))
+        new_trees[action] = new_tree        
+
     return new_trees
 
 def features_from_game_state(self, game_state, self_action):
