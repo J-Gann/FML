@@ -21,7 +21,8 @@ def act(self, game_state: dict):
 
 
 def explore(self, game_state):
-    return np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT', 'BOMB'])
+    choice = np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT', 'BOMB'])
+    return choice
 
 def exploit(self, game_state):
     best_prediction = "WAIT"
@@ -29,10 +30,10 @@ def exploit(self, game_state):
     for action in Actions:
         action = action.name
         features = np.array(features_from_game_state(self, game_state, action))
-        prediction = self.trees[action].predict(features.reshape(-1, 1))
+        prediction = self.trees[action].predict(features.reshape(1, -1) )
         if(best_prediction_value < prediction):
             best_prediction_value = prediction
             best_prediction = action
-    
+    if best_prediction == "BOMB": print("BOMB")
     return best_prediction
 

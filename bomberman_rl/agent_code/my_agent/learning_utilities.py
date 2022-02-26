@@ -1,6 +1,6 @@
-from matplotlib.pyplot import new_figure_manager
+
 from sklearn import tree
-from .path_utilities import move_to_nearest_coin
+from .path_utilities import move_to_nearest_coin, move_to_nearest_bomb
 import events as e
 import pickle
 from enum import Enum
@@ -10,7 +10,7 @@ from joblib import dump, load
 import os
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.5
+LEARNING_RATE = 0.1
 
 # Learning model:
 # ---------------
@@ -52,7 +52,7 @@ def setup_learning_features(self, load_model=False):
             "WAIT": tree.DecisionTreeRegressor(),
             "BOMB": tree.DecisionTreeRegressor()
         }
-        for action_tree in self.trees: self.trees[action_tree].fit([[0]], [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0] + [0,0,0,0,0,0]).reshape(1, -1) , [0])
     else:
         self.trees = {
             "UP": tree.DecisionTreeRegressor(),
@@ -62,7 +62,7 @@ def setup_learning_features(self, load_model=False):
             "WAIT": tree.DecisionTreeRegressor(),
             "BOMB": tree.DecisionTreeRegressor()
         }
-        for action_tree in self.trees: self.trees[action_tree].fit([[0]], [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0] + [0,0,0,0,0,0]).reshape(1, -1) , [0])
 
 def update_transitions(self, old_game_state, self_action, new_game_state, events):
     # Store transitions (not the optimal solution, TODO: delete this later)
@@ -77,9 +77,9 @@ def update_transitions(self, old_game_state, self_action, new_game_state, events
     update_action_value_data(self, old_game_state, self_action, new_game_state, events)
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
-    current_guess = trees[self_action].predict(old_features.reshape(-1, 1))
-    predicted_future_reward = np.max([trees[action_tree].predict(new_features.reshape(-1, 1)) for action_tree in trees])
-    predicted_action_value = trees[self_action].predict(old_features.reshape(-1, 1))
+    current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
+    predicted_future_reward = np.max([trees[action_tree].predict(new_features.reshape(1, -1) ) for action_tree in trees])
+    predicted_action_value = trees[self_action].predict(old_features.reshape(1, -1) )
     q_value = current_guess + LEARNING_RATE * ( rewards + DISCOUNT * predicted_future_reward - predicted_action_value)
     return q_value
 
@@ -110,8 +110,10 @@ def _train_q_model(action_value_data):
             features.append(feature)
             values.append(value)
             
-        new_tree = tree.DecisionTreeRegressor()
-        new_tree.fit(np.array(features).reshape(-1, 1), np.array(values))
+        new_tree = tree.DecisionTreeRegressor(
+            max_depth=2
+        )
+        new_tree.fit(np.array(features), np.array(values))
         new_trees[action] = new_tree        
 
     return new_trees
@@ -131,10 +133,23 @@ def features_from_game_state(self, game_state, self_action):
     # - BlastZoneInTheWay (0/1) => indicator whether the action of the tree would place the agent in the blast zone of an enemy
     # - AgentPosition (x,y coordinates or node label) => indicator where the agent is. May be useful for the agent to get spacial awareness (is it in the center or one of the corners)
 
-    if len(game_state["coins"]) == 0: return [0]
-    move = move_to_nearest_coin(self, game_state["self"][3], game_state["coins"])
-    if move == self_action: return np.array([1])
-    else: return np.array([0])
+    features = []
+
+
+    if len(game_state["coins"]) == 0: features += [0,0,0,0,0,0]
+    else:
+        move_coin = move_to_nearest_coin(self, game_state["self"][3], game_state["coins"])
+        features += [int(move_coin == "UP"), int(move_coin == "RIGHT"), int(move_coin == "DOWN"), int(move_coin == "LEFT"), int(move_coin == "WAIT"), int(move_coin == "BOMB")]
+    if len(game_state["bombs"]) == 0: features += [0,0,0,0,0,0]
+    else:
+        move_bomb = move_to_nearest_bomb(self, game_state["self"][3], game_state["bombs"])
+        features += [int(move_bomb == "UP"), int(move_bomb == "RIGHT"), int(move_bomb == "DOWN"), int(move_bomb == "LEFT"), int(move_bomb == "WAIT"), int(move_bomb == "BOMB")]
+
+        #if move == self_action: features += [1] #return np.array([1])
+        #else: features += [0] #return np.array([0])
+
+
+    return np.array(features)
 
 def _rewards_from_events(events):
     game_rewards = {

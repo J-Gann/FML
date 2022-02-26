@@ -73,6 +73,39 @@ def print_field(field):
         print(" ___ ", end="")
     print("")
 
+
+def move_to_nearest_bomb(self, agent, bombs):
+    bombs = [(bomb[0][0], bomb[0][1]) for bomb in bombs]
+    bomb_nodes = [_index_to_node(bomb) for bomb in bombs]
+    agent_node = _index_to_node(agent)
+    return _move_to_nearest_bomb(self.dist_matrix, self.predecessors_matrix, agent_node, bomb_nodes)
+    
+
+def _move_to_nearest_bomb(dist_matrix, predecessors_matrix, agent_node, bomb_nodes):
+    distances = [dist_matrix[agent_node, bomb] for bomb in bomb_nodes]
+    nearest_bomb = bomb_nodes[np.argmin(distances)]
+    shortest_path = _traverse_shortest_path(predecessors_matrix, agent_node, nearest_bomb)
+    if len(shortest_path) == 0: return Actions.WAIT.name
+
+    next_node = shortest_path[1]
+
+    cx, cy = _node_to_index(next_node)
+    ax, ay = _node_to_index(agent_node)
+
+    if cx - ax > 0: return Actions.RIGHT.name
+    elif cx - ax < 0: return Actions.LEFT.name
+    elif cy - ay > 0: return Actions.DOWN.name
+    elif cy - ay < 0: return Actions.UP.name
+
+
+def box_in_the_way(game_state):
+    pass
+
+def in_blast_zone():
+    pass
+
+
+
 def move_to_nearest_coin(self, agent, coins):
     coin_nodes = [_index_to_node(coin) for coin in coins]
     agent_node = _index_to_node(agent)
