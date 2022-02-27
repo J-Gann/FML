@@ -1,31 +1,18 @@
 
 from sklearn import tree
-from .path_utilities import move_to_nearest_coin, move_to_nearest_bomb
+from .path_utilities import move_to_nearest_coin
 import events as e
-import pickle
 from enum import Enum
 from sklearn import tree
 import numpy as np
-from joblib import dump, load
-import os
+from sklearn.tree import export_graphviz
+
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
+EXPLOITATION_RATE = 0.1
 
-# Learning model:
-# ---------------
-# 1) Initially fit action_value_models to 0
-# 2) For each episode (f.e. 100 rounds):
-#   3) In each step: update action_value_data for the state and action pair and store it in a dictionary throughout all episodes (use existing predictions of action_value_models)
-#   4) After each episode: Fit action_value_models using (updated) action_value_data
-
-# Notes:
-# ------
-# Datastructure action_value_data:
-action_value_data = { "UP": {tuple(np.array([0,0,1])): 100}, "DOWN": {}, "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {} }
-
-
-# ########################################################################################
+feature_names=["move_up_to_coin", "move_right_to_coin","move_down_to_coin","move_left_to_coin","move_wait_to_coin","move_bomb_to_coin","move_to_coin_distance"]         
 
 class Actions(Enum):
     UP = 0
@@ -35,46 +22,19 @@ class Actions(Enum):
     WAIT = 4 
     BOMB = 5
 
-def setup_learning_features(self, load_model=False):
-    # self.old_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    # self.new_features = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
-    # self.rewards = { "UP": [], "DOWN": [], "LEFT": [], "RIGHT": [], "WAIT": [], "BOMB": [] }
+def setup_learning_features(self):
+    self.exploration_probability = 1 # Set probability of exploration actions to 1
+    self.episode_coins = 0
     self.action_value_data = { "UP": {}, "DOWN": {}, "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {} }
-
-    if load_model and os.path.isfile("models.joblib"): self.trees = load("models.joblib")
-    elif load_model:
-        print("[Warn] Cannot load model from the filesystem! Initializing untrained model.")
-        self.trees = {
-            "UP": tree.DecisionTreeRegressor(),
-            "DOWN": tree.DecisionTreeRegressor(),
-            "LEFT": tree.DecisionTreeRegressor(),
-            "RIGHT": tree.DecisionTreeRegressor(),
-            "WAIT": tree.DecisionTreeRegressor(),
-            "BOMB": tree.DecisionTreeRegressor()
+    self.trees = {
+        "UP": tree.DecisionTreeRegressor(),
+        "DOWN": tree.DecisionTreeRegressor(),
+        "LEFT": tree.DecisionTreeRegressor(),
+        "RIGHT": tree.DecisionTreeRegressor(),
+        "WAIT": tree.DecisionTreeRegressor(),
+        "BOMB": tree.DecisionTreeRegressor()
         }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0] + [0,0,0,0,0,0]).reshape(1, -1) , [0])
-    else:
-        self.trees = {
-            "UP": tree.DecisionTreeRegressor(),
-            "DOWN": tree.DecisionTreeRegressor(),
-            "LEFT": tree.DecisionTreeRegressor(),
-            "RIGHT": tree.DecisionTreeRegressor(),
-            "WAIT": tree.DecisionTreeRegressor(),
-            "BOMB": tree.DecisionTreeRegressor()
-        }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0] + [0,0,0,0,0,0]).reshape(1, -1) , [0])
-
-def update_transitions(self, old_game_state, self_action, new_game_state, events):
-    # Store transitions (not the optimal solution, TODO: delete this later)
-    # old_features = features_from_game_state(self, old_game_state, self_action)
-    # new_features = features_from_game_state(self, new_game_state, self_action)
-    # rewards = _rewards_from_events(events)
-    # self.old_features[self_action].append(old_features)
-    # self.new_features[self_action].append(new_features)
-    # self.rewards[self_action].append(rewards)
-
-    # Calculate new action_value for the old_game_state
-    update_action_value_data(self, old_game_state, self_action, new_game_state, events)
+    for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0,-9999]).reshape(1, -1) , [0])
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
@@ -84,71 +44,48 @@ def _action_value_data(trees, old_features, self_action, new_features, rewards):
     return q_value
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
+    if e.COIN_COLLECTED in events: self.episode_coins += 1
     old_features = np.array(features_from_game_state(self, old_game_state, self_action))
     new_features = np.array(features_from_game_state(self, new_game_state, self_action))
     rewards = _rewards_from_events(events)
     q_value = _action_value_data(self.trees, old_features, self_action, new_features, rewards)
     self.action_value_data[self_action][tuple(old_features)] = q_value
 
-def train_q_model(self, saveModel=False):
-    self.trees = _train_q_model(self.action_value_data)
-    if saveModel: dump(self.trees, "models.joblib")
+def train_q_model(self, game_state, episode_rounds):
+    round = game_state["round"]
+    if round % episode_rounds == 0:
+        print("Average coins:", self.episode_coins / episode_rounds, "Exploration prob.:", self.exploration_probability)
+        self.episode_coins = 0
+        if self.exploration_probability - EXPLOITATION_RATE < 0: self.exploration_probability = 0
+        else: self.exploration_probability -= EXPLOITATION_RATE
+        self.trees = _train_q_model(self.action_value_data)
+        for action in Actions:
+            export_graphviz(
+                self.trees[action.name],
+                out_file="./trees/"+action.name+".dot",
+                feature_names=feature_names)
 
 def _train_q_model(action_value_data):
     new_trees = {}
     for action in Actions:
         action = action.name
-
         action_value_data_action = action_value_data[action]
-
         features = []
         values = []
-
         for key in action_value_data_action:
             feature = np.array(key)
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-            
-        new_tree = tree.DecisionTreeRegressor(
-            max_depth=2
-        )
+        new_tree = tree.DecisionTreeRegressor(max_depth=3)
         new_tree.fit(np.array(features), np.array(values))
         new_trees[action] = new_tree        
-
     return new_trees
 
 def features_from_game_state(self, game_state, self_action):
-    # Additional features for exercise 02:
-    # - AgentCanPlaceBomb (1/0) => indicator whether the agent can place its bomb
-    # - BoxInTheWay (1/0) => indicator wether the move of the tree would place the agent on a box
-    # - AgentInBlastZone (1/0) => indicator whether the agent is in the blast zone of a placed bomb
-    # - FastestMoveOutOfBlastzone (1/0) => indicator whether the move of the tree is the fastest move away from the blast zone
-    # - BlastInTheWay (1/0) => indicator whether the move of the tree would place the agent in an active blast
-    # - BlastInTheWayTTL (1..n) => number of steps the blast in the way of the tree is still active
-
-    # Additional thoughts:
-    # - Add features to give the agent a sense of direction (append all features of the last step, append the last n moves of the agent, append the last n moves of enemies)
-    # - Add the state of enemy agents to for example predict their actions (can this be learned during the actual game?) or predict when they are in a vulnerable state for example, they are in a corner or do not have a bomb
-    # - BlastZoneInTheWay (0/1) => indicator whether the action of the tree would place the agent in the blast zone of an enemy
-    # - AgentPosition (x,y coordinates or node label) => indicator where the agent is. May be useful for the agent to get spacial awareness (is it in the center or one of the corners)
-
     features = []
-
-
-    if len(game_state["coins"]) == 0: features += [0,0,0,0,0,0]
-    else:
-        move_coin = move_to_nearest_coin(self, game_state["self"][3], game_state["coins"])
-        features += [int(move_coin == "UP"), int(move_coin == "RIGHT"), int(move_coin == "DOWN"), int(move_coin == "LEFT"), int(move_coin == "WAIT"), int(move_coin == "BOMB")]
-    if len(game_state["bombs"]) == 0: features += [0,0,0,0,0,0]
-    else:
-        move_bomb = move_to_nearest_bomb(self, game_state["self"][3], game_state["bombs"])
-        features += [int(move_bomb == "UP"), int(move_bomb == "RIGHT"), int(move_bomb == "DOWN"), int(move_bomb == "LEFT"), int(move_bomb == "WAIT"), int(move_bomb == "BOMB")]
-
-        #if move == self_action: features += [1] #return np.array([1])
-        #else: features += [0] #return np.array([0])
-
-
+    move_to_coin, distance = move_to_nearest_coin(game_state)
+    features += move_to_coin + distance
     return np.array(features)
 
 def _rewards_from_events(events):

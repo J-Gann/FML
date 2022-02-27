@@ -16,11 +16,10 @@ def setup(self):
 
 def act(self, game_state: dict):
     # Exploit or explore according to the exploration probability
-    if np.random.randint(1,100)/100 < self.exploration_probability: return explore(self, game_state)
+    if np.random.randint(1,100) / 100 < self.exploration_probability: return explore()
     else: return exploit(self, game_state)
 
-
-def explore(self, game_state):
+def explore():
     choice = np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT', 'BOMB'])
     return choice
 

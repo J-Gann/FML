@@ -1,8 +1,7 @@
 import settings as s
 import math
 from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import shortest_path
-import pickle
+from scipy.sparse.csgraph import dijkstra
 import numpy as np
 from enum import Enum
 import os
@@ -15,40 +14,6 @@ class Actions(Enum):
     WAIT = 4 
     BOMB = 5
 
-def setup_graph_features(self, field, load=True, save=False):
-    if load and os.path.isfile("./data/bomberman_graph") and os.path.isfile("./data/bomberman_dist_matrix") and os.path.isfile("./data/bomberman_predecessors_matrix"):
-        bomberman_graph_file = open('./data/bomberman_graph', 'rb')
-        self.graph = pickle.load(bomberman_graph_file)
-        bomberman_graph_file.close()
-
-        bomberman_dist_matrix_file = open('./data/bomberman_dist_matrix', 'rb')
-        self.dist_matrix = pickle.load(bomberman_dist_matrix_file)
-        bomberman_dist_matrix_file.close()
-
-        bomberman_predecessors_matrix_file = open('./data/bomberman_predecessors_matrix', 'rb')
-        self.predecessors_matrix = pickle.load(bomberman_predecessors_matrix_file)
-        bomberman_predecessors_matrix_file.close()
-    elif load:
-        print("[Warn] Cannot load precomputed path data. Recomputing ...")
-        self.graph = _create_graph(field)
-        self.dist_matrix, self.predecessors_matrix = _shortest_paths(self.graph)
-    else:
-        self.graph = _create_graph(field)
-        self.dist_matrix, self.predecessors_matrix = _shortest_paths(self.graph)
-
-
-    if save:
-        bomberman_graph_file = open('./data/bomberman_graph', 'wb')
-        pickle.dump(self.graph, bomberman_graph_file)
-        bomberman_graph_file.close()
-
-        bomberman_dist_matrix_file = open('./data/bomberman_dist_matrix', 'wb')
-        pickle.dump(self.dist_matrix, bomberman_dist_matrix_file)
-        bomberman_dist_matrix_file.close()
-        
-        bomberman_predecessors_matrix_file = open('./data/bomberman_predecessors_matrix', 'wb')
-        pickle.dump(self.predecessors_matrix, bomberman_predecessors_matrix_file)
-        bomberman_predecessors_matrix_file.close()
 
 def print_field(field):
     print(" ", end="")
@@ -73,61 +38,68 @@ def print_field(field):
         print(" ___ ", end="")
     print("")
 
+def move_out_of_blast_zone():
+    # filter nodes which are out of blast zone of placed bomb
+    # _next_step_to_nearest_node
+    # return move and distance out of blast zone
+    pass
 
-def move_to_nearest_bomb(self, agent, bombs):
-    bombs = [(bomb[0][0], bomb[0][1]) for bomb in bombs]
-    bomb_nodes = [_index_to_node(bomb) for bomb in bombs]
-    agent_node = _index_to_node(agent)
-    return _move_to_nearest_bomb(self.dist_matrix, self.predecessors_matrix, agent_node, bomb_nodes)
-    
+def box_in_the_way():
+    # for each movement (left, right, up, down) return 1 if it would place the agent on a box
+    pass
 
-def _move_to_nearest_bomb(dist_matrix, predecessors_matrix, agent_node, bomb_nodes):
-    distances = [dist_matrix[agent_node, bomb] for bomb in bomb_nodes]
-    nearest_bomb = bomb_nodes[np.argmin(distances)]
-    shortest_path = _traverse_shortest_path(predecessors_matrix, agent_node, nearest_bomb)
-    if len(shortest_path) == 0: return Actions.WAIT.name
+def move_to_nearest_box():
+    # compute next move to nearest box
+    pass
 
-    next_node = shortest_path[1]
-
-    cx, cy = _node_to_index(next_node)
-    ax, ay = _node_to_index(agent_node)
-
-    if cx - ax > 0: return Actions.RIGHT.name
-    elif cx - ax < 0: return Actions.LEFT.name
-    elif cy - ay > 0: return Actions.DOWN.name
-    elif cy - ay < 0: return Actions.UP.name
-
-
-def box_in_the_way(game_state):
+def blast_in_the_way():
+    # for each movement (left, right, up, down) return a number if it would place the agent
+    # on a blast zone. the number is the steps until the blast
     pass
 
 def in_blast_zone():
+    # return a number if the agent is in a blast zone. the number is time till explosion
     pass
 
+def move_possible():
+    # for each movement (left, right, up, down, wait, bomb) return 1 if the movement is possible
+    pass
 
+def move_to_nearest_coin(game_state):
+    coins = game_state["coins"]
+    return _next_step_to_nearest_node(coins, game_state)
 
-def move_to_nearest_coin(self, agent, coins):
-    coin_nodes = [_index_to_node(coin) for coin in coins]
-    agent_node = _index_to_node(agent)
-    return _move_to_nearest_coin(self.dist_matrix, self.predecessors_matrix, agent_node, coin_nodes)
+def _next_step_to_nearest_node(nodes, game_state):
+    if len(nodes) == 0: return Actions.WAIT.name, -9999
+    nodes = [_index_to_node(node) for node in nodes]
+    nodes = list(filter(lambda node: _is_not_blocked_node(game_state["field"], game_state["explosion_map"], node), nodes)) # remove all coins which are at a blocked position (inside an explosion)
+    if len(nodes) == 0: return Actions.WAIT.name, -9999
+    agent_node = _index_to_node(game_state["self"][3])
+    if not _is_not_blocked_node(game_state["field"], game_state["explosion_map"], agent_node): return Actions.WAIT.name, -9999
 
-def _move_to_nearest_coin(dist_matrix, predecessors_matrix, agent_node, coin_nodes):
-    distances = [dist_matrix[agent_node, coin] for coin in coin_nodes]
-    nearest_coin = coin_nodes[np.argmin(distances)]
-    shortest_path = _traverse_shortest_path(predecessors_matrix, agent_node, nearest_coin)
-    if len(shortest_path) == 0: return Actions.WAIT.name
+    movement_graph = _create_graph(game_state["field"], game_state["explosion_map"])
+    distances, predecessors, sources = dijkstra(csgraph=movement_graph, directed=True, indices=nodes, return_predecessors=True, unweighted=True, min_only=True)
+    source = sources[agent_node]
+    action = Actions.WAIT.name
+    distance = -9999
+    if source != -9999: # A path to one of the nodes exists
+        distance = distances[agent_node]
+        next_node = predecessors[agent_node]
+        cx, cy = _node_to_index(next_node)
+        ax, ay = _node_to_index(agent_node)
+        if cx - ax > 0: action = Actions.RIGHT.name
+        elif cx - ax < 0: action = Actions.LEFT.name
+        elif cy - ay > 0: action = Actions.DOWN.name
+        elif cy - ay < 0: action = Actions.UP.name
+    return action_to_one_hot(action), [distance]
 
-    next_node = shortest_path[1]
+def action_to_one_hot(action): return [int(action == "UP"), int(action == "RIGHT"), int(action == "DOWN"), int(action == "LEFT"), int(action == "WAIT"), int(action == "BOMB")]
 
-    cx, cy = _node_to_index(next_node)
-    ax, ay = _node_to_index(agent_node)
+def _is_not_blocked_node(field, explosion_map, node):
+    x,y = _node_to_index(node)
+    return field[x, y] == 0 and explosion_map[x, y] == 0
 
-    if cx - ax > 0: return Actions.RIGHT.name
-    elif cx - ax < 0: return Actions.LEFT.name
-    elif cy - ay > 0: return Actions.DOWN.name
-    elif cy - ay < 0: return Actions.UP.name
-
-def _create_graph(field):    
+def _create_graph(field, explosion_map):    
     # Fields are connected to at most 4 other fields, therefore the matrix is sparse.
     # Use an adjacency list to limit resource consumtion.
     row = []
@@ -142,32 +114,13 @@ def _create_graph(field):
                 if 0 <= nx < s.COLS and 0 <= ny < s.ROWS:
                     node = _index_to_node((x, y))
                     neighbor = _index_to_node((nx, ny))
-                    row.append(node)
-                    col.append(neighbor)
-                    # Insert an edge between node and neighbor if neither node nor neighbor is a wall
-                    if field[nx, ny] >= 0 and field[x, y] >= 0: data.append(1)
-                    # If either node or neighbor is a wall, set edge weight to infinity => shortest path algorithms wont use that
-                    # edge, e.g wont move to the field with the wall 
-                    else: data.append(math.inf)
+                    # Insert an edge between node and neighbor if neither node nor neighbor is a wall and neighbor is no explosion
+                    if _is_not_blocked_node(field, explosion_map, node) and _is_not_blocked_node(field, explosion_map, neighbor):
+                        row.append(node)
+                        col.append(neighbor)
+                        data.append(1)
     # Create a sparse adjacency matrix
     return csr_matrix((data, (row, col)))
-
-def _shortest_paths(graph):
-    dist_matrices, predecessors_matrix = shortest_path(csgraph=graph, directed=False, return_predecessors=True)
-    return dist_matrices, predecessors_matrix
-
-def _traverse_shortest_path(predecessors_matrix, source, target):
-    if source == target: return []
-    predecessors = predecessors_matrix[source]
-    def get_path(node):
-        pred = predecessors[node]
-        if pred == source: return [source]
-        path = get_path(pred)
-        path.append(pred)
-        return path
-    path = get_path(target)
-    path.append(target)
-    return path
 
 def _index_to_node(index):
     return index[1] * s.COLS + index[0]
