@@ -6,7 +6,6 @@ from enum import Enum
 from joblib import dump, load
 import events as e
 
-
 class Actions(Enum):
     UP = 0
     RIGHT = 1

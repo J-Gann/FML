@@ -2,6 +2,8 @@ import numpy as np
 from .learning_utilities import features_from_game_state
 from enum import Enum
 
+EPSILON = 0
+
 class Actions(Enum):
     UP = 0
     RIGHT = 1
@@ -11,12 +13,11 @@ class Actions(Enum):
     BOMB = 5
 
 def setup(self):
-    # Initialize to force exploitation. This gets overwritten by the training setup to 1 in case of a training session
-    self.exploration_probability = 0
+    self.EPSILON = EPSILON
 
 def act(self, game_state: dict):
     # Exploit or explore according to the exploration probability
-    if np.random.randint(1,100) / 100 < self.exploration_probability: return explore()
+    if np.random.randint(1,100) / 100 < self.EPSILON: return explore()
     else: return exploit(self, game_state)
 
 def explore():
@@ -29,10 +30,9 @@ def exploit(self, game_state):
     for action in Actions:
         action = action.name
         features = np.array(features_from_game_state(self, game_state, action))
-        prediction = self.trees[action].predict(features.reshape(1, -1) )
+        prediction = self.trees[action].predict(features.reshape(1, -1))
         if(best_prediction_value < prediction):
             best_prediction_value = prediction
             best_prediction = action
-    if best_prediction == "BOMB": print("BOMB")
     return best_prediction
 

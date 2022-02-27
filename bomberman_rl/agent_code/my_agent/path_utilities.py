@@ -1,12 +1,9 @@
 import settings as s
 import math
-from scipy.sparse import csr_matrix, find
+from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 import numpy as np
 from enum import Enum
-import os
-
-UNDEFINED_VALUE = -9999
 
 class Actions(Enum):
     UP = 0
@@ -94,6 +91,7 @@ class FeatureExtraction():
         return self._next_step_to_nearest_node(nodes)
 
     def _next_step_to_nearest_node(self, nodes):
+        # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self._remove_obstructed_nodes(nodes)
         nodes = self._remove_nodes_out_of_range(nodes)
         if len(nodes) == 0: return Actions.WAIT
