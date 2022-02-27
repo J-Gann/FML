@@ -1,6 +1,6 @@
 
 from sklearn import tree
-from .path_utilities import move_to_nearest_coin
+from .path_utilities import FeatureExtraction
 import events as e
 from enum import Enum
 from sklearn import tree
@@ -12,7 +12,7 @@ DISCOUNT = 0.95
 LEARNING_RATE = 0.1
 EXPLOITATION_RATE = 0.1
 
-feature_names=["move_up_to_coin", "move_right_to_coin","move_down_to_coin","move_left_to_coin","move_wait_to_coin","move_bomb_to_coin","move_to_coin_distance"]         
+feature_names = ["move_to_coin_up", "move_to_coin_right","move_to_coin_down","move_to_coin_left","move_to_coin_wait","move_to_coin_bomb"] + ["move_to_safety_up", "move_to_safety_right","move_to_safety_down","move_to_safety_left","move_to_safety_wait","move_to_safety_bomb"]
 
 class Actions(Enum):
     UP = 0
@@ -34,7 +34,7 @@ def setup_learning_features(self):
         "WAIT": tree.DecisionTreeRegressor(),
         "BOMB": tree.DecisionTreeRegressor()
         }
-    for action_tree in self.trees: self.trees[action_tree].fit(np.array([0,0,0,0,0,0,-9999]).reshape(1, -1) , [0])
+    for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(12)).reshape(1, -1) , [0])
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
@@ -77,15 +77,18 @@ def _train_q_model(action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = tree.DecisionTreeRegressor(max_depth=3)
+        new_tree = tree.DecisionTreeRegressor(max_depth=2)
         new_tree.fit(np.array(features), np.array(values))
         new_trees[action] = new_tree        
     return new_trees
 
 def features_from_game_state(self, game_state, self_action):
+    feature_extraction = FeatureExtraction(game_state)
     features = []
-    move_to_coin, distance = move_to_nearest_coin(game_state)
-    features += move_to_coin + distance
+    move = feature_extraction.FEATURE_move_to_nearest_coin().as_one_hot()
+    features += move
+    move = feature_extraction.FEATURE_move_out_of_blast_zone().as_one_hot()
+    features += move
     return np.array(features)
 
 def _rewards_from_events(events):
