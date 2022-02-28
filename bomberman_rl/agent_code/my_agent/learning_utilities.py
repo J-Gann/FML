@@ -10,11 +10,12 @@ import os
 from joblib import dump, load
 
 
-DISCOUNT = 0.95
+DISCOUNT = 0.99
 LEARNING_RATE = 0.1
-EPSILON = 1
-EPSILON_DECREASE_RATE = 0.1
+EPSILON = 0.9
+EPSILON_DECREASE_RATE = 0.7
 MODEL_PATH = "model.joblib"
+
 feature_names = ["move_to__nearest_coin_up",
 "move_to__nearest_coin_right",
 "move_to__nearest_coin_down",
@@ -40,7 +41,14 @@ feature_names = ["move_to__nearest_coin_up",
 "move_left_possible",
 "move_wait_possible",
 "move_bomb_possible",
- "boxes_in_range"]
+ "boxes_in_range",
+ "move_up_to_death",
+"move_right_to_death",
+"move_down_to_death",
+"move_left_to_death",
+"move_wait_to_death",
+"move_bomb_to_death",
+ "bomb_good"]
 
 def setup_learning_features(self, load_model=True):
     self.EPSILON = EPSILON
@@ -58,13 +66,16 @@ def setup_learning_features(self, load_model=True):
             "WAIT": tree.DecisionTreeRegressor(),
             "BOMB": tree.DecisionTreeRegressor()
             }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(26)).reshape(1, -1) , [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(33)).reshape(1, -1) , [0])
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
     predicted_future_reward = np.max([trees[action_tree].predict(new_features.reshape(1, -1) ) for action_tree in trees])
     predicted_action_value = trees[self_action].predict(old_features.reshape(1, -1) )
     q_value_update = rewards + DISCOUNT * predicted_future_reward - predicted_action_value
+    print("q_value_update", np.sum(np.abs(q_value_update)))
+    if q_value_update > 10: 
+        print(old_features, new_features, self_action, rewards)
     q_value = current_guess + LEARNING_RATE * q_value_update
     return q_value
 
@@ -81,7 +92,7 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
     if round % episode_rounds == 0:
         print("Average coins:", self.episode_coins / episode_rounds, "Epsilon:", self.EPSILON)
         self.episode_coins = 0
-        self.EPSILON -= EPSILON_DECREASE_RATE
+        #self.EPSILON *= EPSILON_DECREASE_RATE
         self.trees = _train_q_model(self.action_value_data)
         if save_model: dump(self.trees, MODEL_PATH)
         for action in Actions:
@@ -104,7 +115,7 @@ def _train_q_model(action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = tree.DecisionTreeRegressor(max_depth=4)
+        new_tree = tree.DecisionTreeRegressor(max_depth=3) # was 3 when it worked good. still worked at 4
         new_tree.fit(np.array(features), np.array(values))
         new_trees[action] = new_tree        
     return new_trees
@@ -124,6 +135,10 @@ def features_from_game_state(self, game_state):
     features += move
     blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()
     features += blast_boxes
+    move = feature_extraction.FEATURE_move_into_death()
+    features += move
+    bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()
+    features += bomb_good
     return np.array(features)
 
 def _rewards_from_events(events):
@@ -131,11 +146,15 @@ def _rewards_from_events(events):
         e.COIN_COLLECTED: 10,
         e.CRATE_DESTROYED: 5,
         e.COIN_FOUND: 5,
-        e.WAITED: -10,
-        e.KILLED_SELF: -10,
-        e.INVALID_ACTION: -10
+        e.WAITED: -1,
+        e.KILLED_SELF: -15,
+        e.INVALID_ACTION: -1,
+        e.BOMB_DROPPED: 2
     }
     reward_sum = 0
+
+    if e.BOMB_EXPLODED in events and not e.COIN_FOUND in events: reward_sum -= 10 # penalize ineffective bombs
+
     for event in events:
         if event in game_rewards:
             reward_sum += game_rewards[event]

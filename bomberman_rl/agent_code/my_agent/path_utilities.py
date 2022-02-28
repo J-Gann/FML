@@ -120,7 +120,7 @@ class FeatureExtraction():
     def _blast_indices(self):
         blast_indices = []
         for x, y in self.bomb_indices:
-            for i in range(3):
+            for i in range(4):
                 if 0 < x+i < s.COLS: blast_indices.append((x+i, y))
                 if s.COLS > x-i > 0: blast_indices.append((x-i, y))
                 if 0 < y+i < s.ROWS: blast_indices.append((x, y+i))
@@ -144,16 +144,16 @@ class FeatureExtraction():
                 if not obstructed and not in_blast_zone: free_indices.append(index)
         if self.agent_index in blast_indices:
             res = self._next_step_to_nearest_index(free_indices)
-            print("move_out_of_blast", res)
+            #print("move_out_of_blast", res)
             return res
         else:
-            print("move_out_of_blast", Actions.NONE)
+            #print("move_out_of_blast", Actions.NONE)
             return Actions.NONE
 
     def FEATURE_move_next_to_nearest_box(self):
         box_neighbors = []
         indices = np.argwhere(self.field == 1)
-        tuple_indices = [(index[1], index[0]) for index in indices]
+        tuple_indices = [(index[0], index[1]) for index in indices]
         # find all neighbors of boxes the agent can move to (the box itsel is always out of range for the agent)
         for x, y in tuple_indices:
             neighbors = [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]
@@ -161,20 +161,21 @@ class FeatureExtraction():
                 if not self._index_obstructed((nx,ny)):
                     box_neighbors.append((nx, ny))
         if self.agent_index in box_neighbors:
-            print("move_to_nearest_box", Actions.WAIT)
+            #print("move_to_nearest_box", Actions.WAIT)
             return Actions.WAIT
         step = self._next_step_to_nearest_index(box_neighbors)
-        print("move_to_nearest_box", step)
+        #print("move_to_nearest_box", step)
         return step
 
     def FEATURE_boxes_in_agent_blast_range(self):
         sum = 0
         x, y = self.agent_index
-        for i in range(3):
+        for i in range(4):
             if 0 < x+i < s.COLS and self.field[x+i, y] == 1: sum+= 1
             if s.COLS > x-i > 0 and self.field[x-i, y] == 1: sum+= 1
             if 0 < y+i < s.ROWS and self.field[x, y+i] == 1: sum+= 1
             if s.ROWS > y-i > 0 and self.field[x, y-i] == 1: sum+= 1
+        #print("boxes_in_blast",sum)
         return [sum]
 
     def FEATURE_in_blast_zone(self):
@@ -202,12 +203,27 @@ class FeatureExtraction():
             elif action == Actions.WAIT: res.append(1)
             elif action == Actions.BOMB: res.append(int(self.game_state["self"][2]))
             else: res.append(int(not self._index_obstructed(self._action_new_index(action))))
-        print("moves_possible", res)
-        print("agent_index", self.agent_index)
+        #print("moves_possible", res)
+        #print("agent_index", self.agent_index)
         return res
 
+    def FEATURE_move_into_death(self):
+        res = []
+        for action in Actions:
+            if action == Actions.NONE: pass
+            elif action == Actions.WAIT: res.append(int(self.agent_index in self._blast_indices()))
+            elif action == Actions.BOMB: res.append(int(self.agent_index in self._blast_indices()))
+            else: res.append(int(self._action_new_index(action) in self._blast_indices()))
+        #print("move_to_death", res)
+        return res
 
-
+    def FEATURE_could_escape_own_bomb(self):
+        old_bomb_indices = self.bomb_indices
+        self.bomb_indices.append(self.agent_index)
+        res = self.FEATURE_move_out_of_blast_zone() != Actions.NONE
+        self.bomb_indices = old_bomb_indices
+        #print("bomb_good", res)
+        return [res]
 '''
 def print_field(field):
     print(" ", end="")
