@@ -11,11 +11,30 @@ from joblib import dump, load
 
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.1
-EPSILON = 1
-EPSILON_DECREASE_RATE = 0.1
+LEARNING_RATE = 0.05
+EPSILON = 0.1
+EPSILON_DECREASE_RATE = 1
 MODEL_PATH = "model.joblib"
-feature_names = ["move_to__nearest_coin", "move_to_safety", "move_to_nearest_box", "in_blast_zone", "action_possible", "boxes_in_range"]
+
+feature_names = ["move_to__nearest_coin_up",
+"move_to__nearest_coin_right",
+"move_to__nearest_coin_down",
+"move_to__nearest_coin_left",
+"move_to__nearest_coin_wait",
+"move_to__nearest_coin_bomb",
+"move_to_safety_up",
+"move_to_safety_right",
+"move_to_safety_down",
+"move_to_safety_left",
+"move_to_safety_wait",
+"move_to_safety_bomb",
+"move_to_nearest_box_up",
+"move_to_nearest_box_right",
+"move_to_nearest_box_down",
+"move_to_nearest_box_left",
+"move_to_nearest_box_wait",
+"move_to_nearest_box_bomb",
+ "in_blast_zone", "boxes_in_range"]
 
 
 def setup_learning_features(self, load_model=True):
@@ -34,7 +53,7 @@ def setup_learning_features(self, load_model=True):
             "WAIT": tree.DecisionTreeRegressor(),
             "BOMB": tree.DecisionTreeRegressor()
             }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(6)).reshape(1, -1) , [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(20)).reshape(1, -1) , [0])
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
@@ -46,9 +65,10 @@ def _action_value_data(trees, old_features, self_action, new_features, rewards):
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
     if e.COIN_COLLECTED in events: self.episode_coins += 1
-    old_features = np.array(features_from_game_state(self, old_game_state, self_action))
-    new_features = np.array(features_from_game_state(self, new_game_state, self_action))
-    rewards = _rewards_from_events(events)
+    old_features = np.array(features_from_game_state(self, old_game_state)[0])
+    new_features, distance_to_bomb = features_from_game_state(self, new_game_state) 
+    new_features = np.array(new_features)
+    rewards = _rewards_from_events(self, events, distance_to_bomb)
     q_value = _action_value_data(self.trees, old_features, self_action, new_features, rewards)
     self.action_value_data[self_action][tuple(old_features)] = q_value
 
@@ -57,7 +77,7 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
     if round % episode_rounds == 0:
         print("Average coins:", self.episode_coins / episode_rounds, "Epsilon:", self.EPSILON)
         self.episode_coins = 0
-        self.EPSILON -= EPSILON_DECREASE_RATE
+        self.EPSILON *= EPSILON_DECREASE_RATE
         self.trees = _train_q_model(self.action_value_data)
         if save_model: dump(self.trees, MODEL_PATH)
         for action in Actions:
@@ -85,35 +105,55 @@ def _train_q_model(action_value_data):
         new_trees[action] = new_tree        
     return new_trees
 
-def features_from_game_state(self, game_state, self_action):
-    self_action = Actions[self_action]
+def features_from_game_state(self, game_state):
     feature_extraction = FeatureExtraction(game_state)
     features = []
-    move = [int(self_action == feature_extraction.FEATURE_move_to_nearest_coin())]
+    move = feature_extraction.FEATURE_move_to_nearest_coin().as_one_hot()
     features += move
-    move = [int(self_action == feature_extraction.FEATURE_move_out_of_blast_zone())]
+    move = feature_extraction.FEATURE_move_out_of_blast_zone().as_one_hot()
     features += move
-    move = [int(self_action == feature_extraction.FEATURE_move_next_to_nearest_box())]
+    move = feature_extraction.FEATURE_move_next_to_nearest_box().as_one_hot()
     features += move
     in_blast = feature_extraction.FEATURE_in_blast_zone()
     features += in_blast
-    move = feature_extraction.FEATURE_action_possible(self_action)
-    features += move
+    #move = feature_extraction.FEATURE_action_possible(self_action)
+    #features += move
     blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()
     features += blast_boxes
-    return np.array(features)
+    #print(features)
+    
+    return np.array(features), feature_extraction._distance_to_nearest_bomb()
 
-def _rewards_from_events(events):
+SUCCESSFUL_BOMB = "SUCCESSFUL_BOMB"
+def _rewards_from_events(self, events, distance_to_bomb):
+    distance_to_bomb = distance_to_bomb[0]
     game_rewards = {
-        e.COIN_COLLECTED: 10,
-        e.CRATE_DESTROYED: 5,
-        e.COIN_FOUND: 5,
-        e.WAITED: -10,
+        e.COIN_COLLECTED: 0,
+        e.CRATE_DESTROYED: 0,
+        e.COIN_FOUND: 0,
+        e.WAITED: -5,
         e.KILLED_SELF: -10,
-        e.INVALID_ACTION: -10
+        e.INVALID_ACTION: 0,
+        e.BOMB_DROPPED: 0,
+        SUCCESSFUL_BOMB: 0
     }
-    reward_sum = 0
+
+    reward_sum = -1 if distance_to_bomb == np.inf else distance_to_bomb
+
+    print(reward_sum, end=", ")
+
+    if self.bomb_timer == 0:
+        print("SUCCESSFUL BOMB")
+        events += [SUCCESSFUL_BOMB]
+
+    self.bomb_timer = -1
+
     for event in events:
         if event in game_rewards:
             reward_sum += game_rewards[event]
+
+        if event == e.BOMB_DROPPED:
+            self.bomb_timer = 6
+   
     return reward_sum
+    

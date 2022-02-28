@@ -91,31 +91,54 @@ class FeatureExtraction():
             if self._node_in_movement_range(node): free_nodes.append(node)
         return free_nodes
 
-    def _next_step_to_nearest_index(self, indices):
+    def _next_step_to_nearest_index(self, indices, distance=False):
         nodes = [self._to_node(index) for index in indices]
-        return self._next_step_to_nearest_node(nodes)
+        return self._next_step_to_nearest_node(nodes, distance)
 
-    def _next_step_to_nearest_node(self, nodes):
+    def _next_step_to_nearest_node(self, nodes, distance=False):
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self._remove_obstructed_nodes(nodes)
         nodes = self._remove_nodes_out_of_range(nodes)
-        if len(nodes) == 0: return Actions.NONE
+        if len(nodes) == 0:
+            if not distance:
+                return Actions.NONE
+            else:
+                Actions.NONE, math.inf
         distances, predecessors, sources = dijkstra(csgraph=self.movement_graph, directed=True, indices=nodes, return_predecessors=True, unweighted=True, min_only=True)
         if not self._node_in_movement_range(self.agent_node):
             # Agent node is currently seperated from all other nodes and is therefore not contained in the movement_graph
             return Actions.NONE 
         source = sources[self.agent_node]
         if source != -9999: # A path to one of the nodes exists
-            distance = distances[self.agent_node]
+            dist = distances[self.agent_node]
             next_node = predecessors[self.agent_node]
             cx, cy = self._to_index(next_node)
             ax, ay = self.agent_index
-            if cx - ax > 0: return Actions.RIGHT
-            elif cx - ax < 0: return Actions.LEFT
-            elif cy - ay > 0: return Actions.DOWN
-            elif cy - ay < 0: return Actions.UP
+            if cx - ax > 0:
+                if not distance:
+                    return Actions.RIGHT
+                else:
+                    return Actions.RIGHT, dist
+            elif cx - ax < 0:
+                if not distance:
+                    return Actions.LEFT
+                else:
+                    return Actions.LEFT, dist
+            elif cy - ay > 0:
+                if not distance:
+                    return Actions.DOWN
+                else:
+                    return Actions.DOWN, dist
+            elif cy - ay < 0:
+                if not distance:
+                    return Actions.UP
+                else:
+                    return Actions.UP, dist
         else:
-            return Actions.NONE
+            if not distance:
+                return Actions.NONE
+            else:
+                return Actions.NONE, math.inf
 
     def _blast_indices(self):
         blast_indices = []
@@ -191,6 +214,11 @@ class FeatureExtraction():
         else:
             new_node = self._action_new_node(agent_action)
             return [int(not self._node_obstructed(new_node) and self._node_in_movement_range(new_node))]
+
+    def _distance_to_nearest_bomb(self):
+        bombs = self.bomb_indices
+        move, distance = self._next_step_to_nearest_index(bombs, True)
+        return [distance]
 
 
 

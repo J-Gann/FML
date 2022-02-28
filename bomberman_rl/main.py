@@ -2,7 +2,9 @@ import os
 from argparse import ArgumentParser
 from pathlib import Path
 from time import sleep, time
-from tqdm import tqdm
+# from tqdm import tqdm
+tqdm = lambda iterable, *args, **kwargs: iterable
+
 
 import settings as s
 from environment import BombeRLeWorld, GUI

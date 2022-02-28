@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     pygame = QuietFallback()
     LOADED_PYGAME = True
 
-try:
-    from tqdm import tqdm
-except ModuleNotFoundError:
-    tqdm = lambda iterable, *args, **kwargs: iterable
+# try:
+#     from tqdm import tqdm
+# except ModuleNotFoundError:
+tqdm = lambda iterable, *args, **kwargs: iterable
