@@ -12,6 +12,7 @@ class Actions(Enum):
     LEFT = 3 
     WAIT = 4 
     BOMB = 5
+    NONE = 6
 
     def as_string(self): self.name
 
@@ -98,11 +99,11 @@ class FeatureExtraction():
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self._remove_obstructed_nodes(nodes)
         nodes = self._remove_nodes_out_of_range(nodes)
-        if len(nodes) == 0: return Actions.WAIT
+        if len(nodes) == 0: return Actions.NONE
         distances, predecessors, sources = dijkstra(csgraph=self.movement_graph, directed=True, indices=nodes, return_predecessors=True, unweighted=True, min_only=True)
         if not self._node_in_movement_range(self.agent_node):
             # Agent node is currently seperated from all other nodes and is therefore not contained in the movement_graph
-            return Actions.WAIT 
+            return Actions.NONE 
         source = sources[self.agent_node]
         if source != -9999: # A path to one of the nodes exists
             distance = distances[self.agent_node]
@@ -114,7 +115,7 @@ class FeatureExtraction():
             elif cy - ay > 0: return Actions.DOWN
             elif cy - ay < 0: return Actions.UP
         else:
-            return Actions.WAIT
+            return Actions.NONE
 
     def _blast_indices(self):
         blast_indices = []
@@ -142,33 +143,54 @@ class FeatureExtraction():
                 in_blast_zone = index in blast_indices
                 if not obstructed and not in_blast_zone: free_indices.append(index)
         if self.agent_index in blast_indices: return self._next_step_to_nearest_index(free_indices)
-        else: return Actions.WAIT
+        else: return Actions.NONE
 
-    def FEATURE_move_to_nearest_box(self):
+    def FEATURE_move_next_to_nearest_box(self):
+        box_neighbors = []
         indices = np.argwhere(self.field == 1)
-        return self._next_step_to_nearest_index(indices)
+        tuple_indices = [(index[0], index[1]) for index in indices]
+        # find all neighbors of boxes the agent can move to (the box itsel is always out of range for the agent)
+        for x, y in tuple_indices:
+            neighbors = [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]
+            for nx, ny in neighbors:
+                if not self._index_obstructed((nx,ny)):
+                    box_neighbors.append((nx, ny))
+        step = self._next_step_to_nearest_index(box_neighbors)
+        return step
+
+    def FEATURE_boxes_in_agent_blast_range(self):
+        sum = 0
+        x, y = self.agent_index
+        for i in range(3):
+            if 0 < x+i < s.COLS and self.field[x+i, y] == 1: sum+= 1
+            if s.COLS > x-i > 0 and self.field[x-i, y] == 1: sum+= 1
+            if 0 < y+i < s.ROWS and self.field[x, y+i] == 1: sum+= 1
+            if s.ROWS > y-i > 0 and self.field[x, y-i] == 1: sum+= 1
+        return [sum]
 
     def FEATURE_in_blast_zone(self):
         blast_nodes = self._blast_nodes()
         if self.agent_node in blast_nodes: return [1]
         else: return [0]
 
-    def FEATURE_action_possible(self):
-        neighbor_up = (self.agent_index[0], self.agent_index[1]+1)
-        neighbor_down = (self.agent_index[0], self.agent_index[1]-1)
-        neighbor_left = (self.agent_index[0]+1, self.agent_index[1])
-        neighbor_right = (self.agent_index[0]-1, self.agent_index[1])
+    def _action_new_index(self, action):
+        # return the node an action puts the agent on
+        if action == Actions.UP: return (self.agent_index[0], self.agent_index[1]-1)
+        elif action == Actions.DOWN: return (self.agent_index[0], self.agent_index[1]+1)
+        elif action == Actions.LEFT: return (self.agent_index[0]-1, self.agent_index[1])
+        elif action == Actions.RIGHT: return (self.agent_index[0]+1, self.agent_index[1])
+        elif action == Actions.WAIT: return self.agent_index
+        elif action == Actions.BOMB: return self.agent_index
 
-        up_allowed = not self._index_obstructed(neighbor_up) and self._index_in_movement_range(neighbor_up)
-        down_allowed  = not self._index_obstructed(neighbor_down) and self._index_in_movement_range(neighbor_down)
-        left_allowed  = not self._index_obstructed(neighbor_left) and self._index_in_movement_range(neighbor_left)
-        right_allowed  = not self._index_obstructed(neighbor_right) and self._index_in_movement_range(neighbor_right)
+    def _action_new_node(self, action):
+        index = self._action_new_index(action)
+        return self._to_node(index)
 
-        wait_allowed = True
-
-        bomb_allowed = self.game_state["self"][2]
-
-        return [int(up_allowed ), int(right_allowed ), int(down_allowed ), int(left_allowed ), int(wait_allowed), int(bomb_allowed)]
+    def FEATURE_action_possible(self, agent_action):
+        if agent_action == Actions.BOMB: return [int(self.game_state["self"][2])]
+        else:
+            new_node = self._action_new_node(agent_action)
+            return [int(not self._node_obstructed(new_node) and self._node_in_movement_range(new_node))]
 
 
 

@@ -1,9 +1,11 @@
 import numpy as np
 from .learning_utilities import features_from_game_state
 from enum import Enum
+from joblib import dump, load
+import os
 
 EPSILON = 0
-
+MODEL_PATH = "model.joblib"
 class Actions(Enum):
     UP = 0
     RIGHT = 1
@@ -13,6 +15,7 @@ class Actions(Enum):
     BOMB = 5
 
 def setup(self):
+    if os.path.isfile(MODEL_PATH): self.trees = load(MODEL_PATH)
     self.EPSILON = EPSILON
 
 def act(self, game_state: dict):
@@ -31,6 +34,7 @@ def exploit(self, game_state):
         action = action.name
         features = np.array(features_from_game_state(self, game_state, action))
         prediction = self.trees[action].predict(features.reshape(1, -1))
+        #print(action, features, prediction)
         if(best_prediction_value < prediction):
             best_prediction_value = prediction
             best_prediction = action
