@@ -62,6 +62,10 @@ class FeatureExtraction():
         # Therefore not filtering them out leads to out of range errors.
         return node < self.movement_graph.shape[0]
 
+    def _index_in_movement_range(self, index):
+        node = self._to_node(index)
+        return self._node_in_movement_range(node)
+
     def _node_obstructed(self, node):
         # Check if the field is obstructed at the node by wither a wall, a boy or an explosion
         x, y = self._to_index(node)
@@ -139,8 +143,36 @@ class FeatureExtraction():
                 if not obstructed and not in_blast_zone: free_indices.append(index)
         if self.agent_index in blast_indices: return self._next_step_to_nearest_index(free_indices)
         else: return Actions.WAIT
-'''
 
+    def FEATURE_move_to_nearest_box(self):
+        indices = np.argwhere(self.field == 1)
+        return self._next_step_to_nearest_index(indices)
+
+    def FEATURE_in_blast_zone(self):
+        blast_nodes = self._blast_nodes()
+        if self.agent_node in blast_nodes: return [1]
+        else: return [0]
+
+    def FEATURE_action_possible(self):
+        neighbor_up = (self.agent_index[0], self.agent_index[1]+1)
+        neighbor_down = (self.agent_index[0], self.agent_index[1]-1)
+        neighbor_left = (self.agent_index[0]+1, self.agent_index[1])
+        neighbor_right = (self.agent_index[0]-1, self.agent_index[1])
+
+        up_allowed = not self._index_obstructed(neighbor_up) and self._index_in_movement_range(neighbor_up)
+        down_allowed  = not self._index_obstructed(neighbor_down) and self._index_in_movement_range(neighbor_down)
+        left_allowed  = not self._index_obstructed(neighbor_left) and self._index_in_movement_range(neighbor_left)
+        right_allowed  = not self._index_obstructed(neighbor_right) and self._index_in_movement_range(neighbor_right)
+
+        wait_allowed = True
+
+        bomb_allowed = self.game_state["self"][2]
+
+        return [int(up_allowed ), int(right_allowed ), int(down_allowed ), int(left_allowed ), int(wait_allowed), int(bomb_allowed)]
+
+
+
+'''
 def print_field(field):
     print(" ", end="")
     for x in range(s.COLS):
@@ -164,19 +196,6 @@ def print_field(field):
         print(" ___ ", end="")
     print("")
 
-def move_out_of_blast_zone(game_state):
-    #if not in_blast_zone(game_state)[0][0]: 
-    #    return action_to_one_hot(Actions.WAIT.name), [UNDEFINED_VALUE]
-    blast_nodes = []
-    for bomb in game_state["bombs"]: blast_nodes += _blasted_nodes(bomb[0])
-    
-    safe_nodes = []
-    for y in range(s.COLS):
-        for x in range(s.ROWS):
-            node = _index_to_node((x,y))
-            if _is_not_blocked_node(game_state, node) and node not in blast_nodes:
-                safe_nodes.append((x,y))
-    return _next_step_to_nearest_node(safe_nodes, game_state)
 
 def box_in_the_way(game_state):
     agent = game_state["self"][3]
@@ -195,96 +214,8 @@ def box_in_the_way(game_state):
     return [int(up_box), int(right_box), int(down_box), int(left_box)]
     
 
-def move_to_nearest_box(game_state):
-    field = game_state["field"]
-    box_nodes = []
-    for y in range(s.COLS):
-        for x in range(s.ROWS):
-            if field[x][y] == 1:
-                box_nodes.append((x,y))
-    return _next_step_to_nearest_node(box_nodes, game_state)
-
 def blast_in_the_way():
     # for each movement (left, right, up, down) return a number if it would place the agent
     # on a blast zone. the number is the steps until the blast
     pass
-
-def in_blast_zone(game_state):
-    agent_node = _index_to_node(game_state["self"][3])
-    for bomb in game_state["bombs"]:
-        blast_nodes = _blasted_nodes(bomb[0])
-        if agent_node in blast_nodes: return [1], [bomb[1]]
-    return [0], [UNDEFINED_VALUE]
-
-def move_possible(game_state):
-    agent = game_state["self"][3]
-    agent_x = agent[0]
-    agent_y = agent[1]
-
-    neighbor_up = (agent_x, agent_y+1)
-    neighbor_down = (agent_x, agent_y-1)
-    neighbor_left = (agent_x+1, agent_y)
-    neighbor_right = (agent_x-1, agent_y)
-
-    up_allowed = _is_not_blocked_node(game_state, _index_to_node(neighbor_up))
-    down_allowed  = _is_not_blocked_node(game_state, _index_to_node(neighbor_down))
-    left_allowed  = _is_not_blocked_node(game_state, _index_to_node(neighbor_left))
-    right_allowed  = _is_not_blocked_node(game_state, _index_to_node(neighbor_right))
-    return [int(up_allowed ), int(right_allowed ), int(down_allowed ), int(left_allowed )]
-
-
-
-def _blasted_nodes(bomb):
-    x = bomb[0]
-    y = bomb[1]
-    blast_indices = [(x, y)]
-    for i in range(3):
-        if x+i < s.ROWS: blast_indices.append((x+i, y))
-        if x-i > 0: blast_indices.append((x-i, y))
-        if y+i < s.COLS: blast_indices.append((x, y+i))
-        if y-i > 0: blast_indices.append((x, y-i))
-    return [_index_to_node(index) for index in blast_indices ]
-
-def _next_step_to_nearest_node(nodes, game_state):
-    if len(nodes) == 0: return action_to_one_hot(Actions.WAIT.name), [UNDEFINED_VALUE]
-    nodes = [_index_to_node(node) for node in nodes]
-    nodes = list(filter(lambda node: _is_not_blocked_node(game_state, node), nodes))
-    if len(nodes) == 0: return action_to_one_hot(Actions.WAIT.name), [UNDEFINED_VALUE]
-    agent_node = _index_to_node(game_state["self"][3])
-    if not _is_not_blocked_node(game_state, agent_node): return action_to_one_hot(Actions.WAIT.name), [UNDEFINED_VALUE]
-
-    movement_graph = _create_graph(game_state)
-
-    #print(movement_graph.shape)
-    #print(nodes)
-
-    distances, predecessors, sources = dijkstra(csgraph=movement_graph, directed=True, indices=nodes, return_predecessors=True, unweighted=True, min_only=True)
-    source = sources[agent_node]
-    action = Actions.WAIT.name
-    distance = UNDEFINED_VALUE
-    if source != UNDEFINED_VALUE: # A path to one of the nodes exists
-        distance = distances[agent_node]
-        next_node = predecessors[agent_node]
-        cx, cy = _node_to_index(next_node)
-        ax, ay = _node_to_index(agent_node)
-        if cx - ax > 0: action = Actions.RIGHT.name
-        elif cx - ax < 0: action = Actions.LEFT.name
-        elif cy - ay > 0: action = Actions.DOWN.name
-        elif cy - ay < 0: action = Actions.UP.name
-    return action_to_one_hot(action), [distance]
-
-
-def _is_not_blocked_node(game_state, node):
-    field = game_state["field"]
-    explosion_map = game_state["explosion_map"]
-    x,y = _node_to_index(node)
-    return field[x, y] == 0 and explosion_map[x, y] == 0
-
-def _is_blocked_node(game_state, node):
-    return not _is_not_blocked_node(game_state, node)
-
-
-
-
-
 '''

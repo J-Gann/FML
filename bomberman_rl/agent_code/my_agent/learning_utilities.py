@@ -13,7 +13,7 @@ DISCOUNT = 0.95
 LEARNING_RATE = 0.1
 EPSILON = 1
 MODEL_PATH = "model.joblib"
-feature_names = ["move_to_coin_up", "move_to_coin_right","move_to_coin_down","move_to_coin_left","move_to_coin_wait","move_to_coin_bomb"]# + ["move_to_safety_up", "move_to_safety_right","move_to_safety_down","move_to_safety_left","move_to_safety_wait","move_to_safety_bomb"]
+feature_names = ["move_to_coin_up", "move_to_coin_right","move_to_coin_down","move_to_coin_left","move_to_coin_wait","move_to_coin_bomb"] + ["move_to_safety_up", "move_to_safety_right","move_to_safety_down","move_to_safety_left","move_to_safety_wait","move_to_safety_bomb"] + ["move_to_box_up", "move_to_box_right","move_to_box_down","move_to_box_left","move_to_box_wait","move_to_box_bomb"] + ["in_blast_zone"] + ["move_up_allowed", "move_right_allowed","move_down_allowed","move_left_allowed","move_wait_allowed","move_bomb_allowed"] 
 
 class Actions(Enum):
     UP = 0
@@ -39,7 +39,7 @@ def setup_learning_features(self, load_model=True):
             "WAIT": tree.DecisionTreeRegressor(),
             "BOMB": tree.DecisionTreeRegressor()
             }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(6)).reshape(1, -1) , [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(25)).reshape(1, -1) , [0])
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1) )
@@ -59,8 +59,9 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 def train_q_model(self, game_state, episode_rounds, save_model=True):
     round = game_state["round"]
     if round % episode_rounds == 0:
-        print("Average coins:", self.episode_coins / episode_rounds)
+        print("Average coins:", self.episode_coins / episode_rounds, "Epsilon:", self.EPSILON)
         self.episode_coins = 0
+        self.EPSILON -= 0.01
         self.trees = _train_q_model(self.action_value_data)
         if save_model: dump(self.trees, MODEL_PATH)
         for action in Actions:
@@ -81,7 +82,7 @@ def _train_q_model(action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = tree.DecisionTreeRegressor(max_depth=2)
+        new_tree = tree.DecisionTreeRegressor(max_depth=20)
         new_tree.fit(np.array(features), np.array(values))
         new_trees[action] = new_tree        
     return new_trees
@@ -91,17 +92,26 @@ def features_from_game_state(self, game_state, self_action):
     features = []
     move = feature_extraction.FEATURE_move_to_nearest_coin().as_one_hot()
     features += move
-    #move = feature_extraction.FEATURE_move_out_of_blast_zone().as_one_hot()
-    #features += move
-
+    move = feature_extraction.FEATURE_move_out_of_blast_zone().as_one_hot()
+    features += move
+    move = feature_extraction.FEATURE_move_to_nearest_box().as_one_hot()
+    features += move
+    in_blast = feature_extraction.FEATURE_in_blast_zone()
+    features += in_blast
+    move = feature_extraction.FEATURE_action_possible()
+    features += move
     return np.array(features)
 
 def _rewards_from_events(events):
     game_rewards = {
         e.COIN_COLLECTED: 1,
         e.KILLED_OPPONENT: 5,
-        e.KILLED_SELF: -10,
-        e.GOT_KILLED: -5
+        e.KILLED_SELF: -5,
+        e.GOT_KILLED: -5,
+        e.WAITED: -1,
+        e.INVALID_ACTION: -1,
+        e.CRATE_DESTROYED: 0.5,
+        e.COIN_FOUND: 0.5
     }
     reward_sum = 0
     for event in events:
