@@ -142,20 +142,29 @@ class FeatureExtraction():
                 obstructed = self._index_obstructed(index)
                 in_blast_zone = index in blast_indices
                 if not obstructed and not in_blast_zone: free_indices.append(index)
-        if self.agent_index in blast_indices: return self._next_step_to_nearest_index(free_indices)
-        else: return Actions.NONE
+        if self.agent_index in blast_indices:
+            res = self._next_step_to_nearest_index(free_indices)
+            print("move_out_of_blast", res)
+            return res
+        else:
+            print("move_out_of_blast", Actions.NONE)
+            return Actions.NONE
 
     def FEATURE_move_next_to_nearest_box(self):
         box_neighbors = []
         indices = np.argwhere(self.field == 1)
-        tuple_indices = [(index[0], index[1]) for index in indices]
+        tuple_indices = [(index[1], index[0]) for index in indices]
         # find all neighbors of boxes the agent can move to (the box itsel is always out of range for the agent)
         for x, y in tuple_indices:
             neighbors = [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]
             for nx, ny in neighbors:
                 if not self._index_obstructed((nx,ny)):
                     box_neighbors.append((nx, ny))
+        if self.agent_index in box_neighbors:
+            print("move_to_nearest_box", Actions.WAIT)
+            return Actions.WAIT
         step = self._next_step_to_nearest_index(box_neighbors)
+        print("move_to_nearest_box", step)
         return step
 
     def FEATURE_boxes_in_agent_blast_range(self):
@@ -186,11 +195,16 @@ class FeatureExtraction():
         index = self._action_new_index(action)
         return self._to_node(index)
 
-    def FEATURE_action_possible(self, agent_action):
-        if agent_action == Actions.BOMB: return [int(self.game_state["self"][2])]
-        else:
-            new_node = self._action_new_node(agent_action)
-            return [int(not self._node_obstructed(new_node) and self._node_in_movement_range(new_node))]
+    def FEATURE_action_possible(self):
+        res = []
+        for action in Actions:
+            if action == Actions.NONE: pass
+            elif action == Actions.WAIT: res.append(1)
+            elif action == Actions.BOMB: res.append(int(self.game_state["self"][2]))
+            else: res.append(int(not self._index_obstructed(self._action_new_index(action))))
+        print("moves_possible", res)
+        print("agent_index", self.agent_index)
+        return res
 
 
 
