@@ -1,4 +1,5 @@
 
+from argparse import Action
 from .path_utilities import FeatureExtraction, Actions
 import events as e
 import numpy as np
@@ -57,17 +58,18 @@ def setup_learning_features(self, load_model=True):
     self.n_rewards = []
 
     self.past_moves = []
+    self.last_bomb_position = []
 
     if load_model and os.path.isfile(MODEL_PATH): self.trees = load(MODEL_PATH)
     else:
         if load_model: print("[WARN] Unable to load model from filesystem. Reinitializing model!")
         self.trees = {
-            "UP": RandomForestRegressor(n_estimators=100, max_depth=3),
-            "DOWN": RandomForestRegressor(n_estimators=100, max_depth=3),
-            "LEFT": RandomForestRegressor(n_estimators=100, max_depth=3),
-            "RIGHT": RandomForestRegressor(n_estimators=100, max_depth=3),
-            "WAIT": RandomForestRegressor(n_estimators=100, max_depth=3),
-            "BOMB": RandomForestRegressor(n_estimators=100, max_depth=3)
+            "UP": RandomForestRegressor(n_estimators=100, max_depth=30),
+            "DOWN": RandomForestRegressor(n_estimators=100, max_depth=30),
+            "LEFT": RandomForestRegressor(n_estimators=100, max_depth=30),
+            "RIGHT": RandomForestRegressor(n_estimators=100, max_depth=30),
+            "WAIT": RandomForestRegressor(n_estimators=100, max_depth=30),
+            "BOMB": RandomForestRegressor(n_estimators=100, max_depth=30)
             }
         for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(33)).reshape(1, -1) , [0])
 
@@ -89,6 +91,7 @@ def _action_value_data_last_step(trees, old_features, self_action, rewards):
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
     self.past_moves.append(self_action)
+    if Actions[self_action] == Actions.BOMB: self.last_bomb_position.append(old_game_state["self"][3])
 
     feature_extration_old = FeatureExtraction(old_game_state)
     feature_extration_new = FeatureExtraction(new_game_state)
@@ -120,8 +123,13 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
         current_guess = self.trees[action].predict(state_old.reshape(1, -1))
 
-        q_value = current_guess + LEARNING_RATE * q_value_update
+        #print("update", q_value_update - current_guess)
 
+        q_value = current_guess + LEARNING_RATE * (q_value_update - current_guess)
+
+        #print("q_value", q_value)
+
+        if not tuple(state_old) in self.action_value_data[action]: print ("NEW STATE FOUND *******************************************")
 
         self.action_value_data[action][tuple(state_old)] = q_value
 
@@ -130,6 +138,7 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
 def update_action_value_last_step(self, last_game_state, last_action, events):
     self.past_moves.append(last_action)
+    if Actions[last_action] == Actions.BOMB: self.last_bomb_position.append(last_game_state["self"][3])
 
     feature_extration_old = FeatureExtraction(last_game_state)
 
@@ -138,6 +147,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
     rewards = _rewards_from_events(self, feature_extration_old, events, last_action)
 
     self.past_moves = []
+    self.last_bomb_position = []
 
     self.n_states_old.append(old_features)
     self.n_actions.append(last_action)
@@ -166,7 +176,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
 
             current_guess = self.trees[action].predict(state_old.reshape(1, -1))
 
-            q_value = current_guess + LEARNING_RATE * q_value_update
+            q_value = current_guess + LEARNING_RATE * (q_value_update - current_guess)
 
             self.action_value_data[action][tuple(state_old)] = q_value
 
@@ -192,7 +202,7 @@ def _train_q_model(action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = RandomForestRegressor(n_estimators=100, max_depth=3)
+        new_tree = RandomForestRegressor(n_estimators=100, max_depth=30)
         features = np.array(features)
         values = np.ravel(np.array(values))
         #X_train, X_test, y_train, y_test = train_test_split(features, values, test_size=0.33)
@@ -257,16 +267,32 @@ def _rewards_from_events(self, feature_extraction, events, action):
     general_movement_reward = 0
     if feature_extraction._action_possible(action) and action != Actions.WAIT and action != Actions.BOMB: pass#general_movement_reward += 1   # Did an allowed move
     else: general_movement_reward -= 1  # Did a not allowed move
-    if action == Actions.WAIT and (action_to_coin != Actions.NONE or action_to_box != Actions.NONE) and not in_blast[0]: general_movement_reward -= 1  # Did wait although there was no need to
-    if not feature_extraction._action_possible(action): general_movement_reward -= 1
+    if action == Actions.WAIT and (action_to_coin != Actions.NONE or action_to_box != Actions.NONE) and not in_blast[0]:
+        print("WAITED <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+        general_movement_reward -= 2  # Did wait although there was no need to
+    if action == Actions.WAIT and action_to_coin != Actions.NONE  and not in_blast[0] and feature_extraction._action_possible(Actions.BOMB):
+        print("WAITED <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+        general_movement_reward -= 2  # Did wait although we could have placed a bomb next to a crate
+    if not feature_extraction._action_possible(action): 
+        
+        print("UNALLOWED ACTION ------------------------")
+        general_movement_reward -= 1
 
     if len(self.past_moves) > 2:
-        if action == Actions.LEFT and Actions[self.past_moves[-2]] == Actions.RIGHT: general_movement_reward -= 1   # Do not reward switching between two nodes
-        if action == Actions.RIGHT and Actions[self.past_moves[-2]] == Actions.LEFT: general_movement_reward -= 1   # Do not reward switching between two nodes
-        if action == Actions.UP and Actions[self.past_moves[-2]] == Actions.DOWN: general_movement_reward -= 1   # Do not reward switching between two nodes
-        if action == Actions.DOWN and Actions[self.past_moves[-2]] == Actions.UP: general_movement_reward -= 1   # Do not reward switching between two nodes
+        if action == Actions.LEFT and Actions[self.past_moves[-2]] == Actions.RIGHT:
+            print("twitch penalty >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            general_movement_reward -= 2   # Do not reward switching between two nodes
+        if action == Actions.RIGHT and Actions[self.past_moves[-2]] == Actions.LEFT:
+            print("twitch penalty >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            general_movement_reward -= 2   # Do not reward switching between two nodes
+        if action == Actions.UP and Actions[self.past_moves[-2]] == Actions.DOWN:
+            print("twitch penalty >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            general_movement_reward -= 2   # Do not reward switching between two nodes
+        if action == Actions.DOWN and Actions[self.past_moves[-2]] == Actions.UP:
+            print("twitch penalty >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            general_movement_reward -= 2   # Do not reward switching between two nodes
 
-    general_movement_reward = max(0, general_movement_reward) # Do not penalize below -1
+    general_movement_reward = max(-2, general_movement_reward) # Do not penalize below -1
 
     # BOMBS
     bomb_reward = 0
@@ -276,7 +302,12 @@ def _rewards_from_events(self, feature_extraction, events, action):
     if action == Actions.BOMB and not bomb_good[0]: bomb_reward -= 1   # Strike bomb bonus if bomb will eventually kill agent
     if action == Actions.BOMB and bomb_good[0] and blast_boxes[0] > 0: bomb_reward += 1 # Bomb will have an effect
     else: bomb_reward -= 1 # Bomb will have no effect
-    #bomb_reward = max(0, bomb_reward) # Do not penalize below -1
+    if len(self.last_bomb_position) > 2:
+        if action == Actions.BOMB and self.last_bomb_position[-2] == feature_extraction.agent_index:
+            print("############same bomb penalty####################")
+            bomb_reward -= 1 # Placed a bomb at the same place as previously
+
+    bomb_reward = max(0, bomb_reward) # Do not penalize below -1
 
     # SAFETY
     safety_reward = 0
@@ -285,19 +316,19 @@ def _rewards_from_events(self, feature_extraction, events, action):
     if action_to_death == action: safety_reward -= 1   # Did move into certain death
     else: safety_reward += 1   # Did not move into certain death
     if action == Actions.WAIT and not in_blast[0] and action_to_coin == Actions.NONE and action_to_box == Actions.NONE: safety_reward += 1  # If there there are no paths to either boxes or coins and the agent is not in a plast, he is probably cornered by a blast
-    #safety_reward = max(0, safety_reward) # Do not penalize below -1
+    safety_reward = max(0, safety_reward) # Do not penalize below -1
 
     # BOXES
     boxes_reward = 0
     if not in_blast[0] and action == action_to_box: boxes_reward += 1  # Did move towards box when not in danger
     else: boxes_reward -= 1   # Did not move towards safety when necessary
-    #boxes_reward = max(0, boxes_reward) # Do not penalize below -1
+    boxes_reward = max(0, boxes_reward) # Do not penalize below -1
 
     # COINS
     coins_reward = 0
     if not in_blast[0] and action == action_to_coin: coins_reward += 1  # Did move towards coin when not in danger
     else: coins_reward -= 1   # Did not move towards safety when necessary
-    #coins_reward = max(0, coins_reward) # Do not penalize below -1
+    coins_reward = max(0, coins_reward) # Do not penalize below -1
 
     #print("movement reward", general_movement_reward)
     #print("bomb reward", bomb_reward)
@@ -312,4 +343,10 @@ def _rewards_from_events(self, feature_extraction, events, action):
     box_importance = 1.2
     coin_importance = 1
 
-    return movement_importance * general_movement_reward + bomb_importance * bomb_reward + safety_importance * safety_reward + box_importance * boxes_reward + coin_importance * coins_reward
+    other_rewards = 0
+
+    if e.SURVIVED_ROUND in events:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!     SURVIVOR   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        other_rewards += 100
+
+    return movement_importance * general_movement_reward + bomb_importance * bomb_reward + safety_importance * safety_reward + box_importance * boxes_reward + coin_importance * coins_reward + other_rewards
