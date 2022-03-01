@@ -1,12 +1,7 @@
-import dis
-import os
-import pickle
-import random
+from abc import ABCMeta, abstractmethod
 
 import numpy as np
 from enum import Enum, auto
-
-from abc import ABCMeta, abstractmethod
 
 # TODO: actually import these settings
 # pythons import system is silly
@@ -25,7 +20,10 @@ K_NEAREST_BOMBS = 1
 
 ####################################
 
+
+# needed because of a problem with format strings and \n
 NEWLINE = "\n"
+
 
 positions = np.empty((17, 17, 2))
 
@@ -33,52 +31,6 @@ for i in range(17):
     for j in range(17):
         positions[i][j][0] = i
         positions[i][j][1] = j
-
-
-class Actions:
-    UP = "UP"
-    RIGHT = "RIGHT"
-    DOWN = "DOWN"
-    LEFT = "LEFT"
-    WAIT = "WAIT"
-    BOMB = "BOMB"
-
-
-def setup(self):
-    pass
-
-
-def act(self, game_state: dict) -> str:
-    state_to_features(game_state)
-    return Actions.WAIT
-
-
-def explain_feature_vector(v):
-    def bool_to_str(b):
-        if int(b) == 1:
-            return "yes"
-        else:
-            return "no"
-
-    print(
-        f"""
-        position: {v[0]}, {v[1]}
-        wall to:
-            top:   {bool_to_str(v[2])}
-            left:  {bool_to_str(v[3])}
-            down:  {bool_to_str(v[4])}
-            right: {bool_to_str(v[5])}
-        opponent distance:
-            one:    {v[6]} {v[7]}
-            two:    {v[8]} {v[9]}
-            three:  {v[10]} {v[11]}
-        closest crate direction: {v[12]}, {v[13]}
-        closest coin direction: {v[14]}, {v[15]}
-        closest bomb direction: {v[16], v[17]}
-        closest explosion direction: {v[18], v[19]}
-        bomb possible: {bool_to_str(v[20])}
-    """
-    )
 
 
 class Feature(metaclass=ABCMeta):
@@ -89,32 +41,6 @@ class Feature(metaclass=ABCMeta):
     @abstractmethod
     def explain_feature(self, feature_vector):
         pass
-
-
-feature_shape = None
-
-
-def state_to_features(game_state: dict):
-
-    features_collectors = [
-        Position(),
-        Walls(),
-        OpponentDirections(),
-        CrateDirections(),
-        CoinDirections(),
-        BombDirections(),
-        ExplosionDirections(),
-        BombPossible(),
-    ]
-
-    features = [fc.compute_feature(game_state).flatten() for fc in features_collectors]
-
-    feature_shape = list(map(len, features))
-
-    last_index = 0
-    for f, fc, idx in zip(features, features_collectors, feature_shape):
-        print(fc.explain_feature(f[last_index:idx]))
-    print(2 * "\n")
 
 
 def format_position(v):
@@ -167,7 +93,9 @@ class ExplosionDirections(TwoDimensionalFeature):
         position = get_position(game_state)
 
         explosion_positions = positions[explosion_map == 1]
-        explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
+        explosion_positions = k_closest(
+            position, explosion_positions, k=K_NEAREST_EXPLOSIONS
+        )
         explosion_direction = explosion_positions - position
         return explosion_direction
 
@@ -197,8 +125,10 @@ class OpponentDirections(Feature):
         return others_directions
 
     def explain_feature(self, feature_vector):
-        positions = [format_position(feature_vector[i:i+2]) for i  in range(3)]
-        return f"distances of opponents: {NEWLINE}    {(NEWLINE + '    ').join(positions)}"
+        positions = [format_position(feature_vector[i : i + 2]) for i in range(3)]
+        return (
+            f"distances of opponents: {NEWLINE}    {(NEWLINE + '    ').join(positions)}"
+        )
 
 
 class Walls(Feature):
@@ -206,7 +136,12 @@ class Walls(Feature):
         x, y = get_position(game_state)
         field = game_state["field"]
         # indicates whether top, left, down, right there is a wall next to agent
-        walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
+        walls = (
+            np.array(
+                [field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]
+            )
+            == -1
+        ).astype(np.int)
         return walls
 
     def explain_feature(self, feature_vector):
@@ -255,7 +190,9 @@ class BombDirections(TwoDimensionalFeature):
 
         within_range = (distances - bomb_steps - 1 - BOMB_POWER - EXPLOSION_TIMER) < 1
         bomb_positions = bomb_positions[within_range]
-        bomb_positions = k_closest(position, bomb_positions, k=K_NEAREST_BOMBS, pad=False)
+        bomb_positions = k_closest(
+            position, bomb_positions, k=K_NEAREST_BOMBS, pad=False
+        )
 
         bomb_direction = bomb_positions - position
         return pad_matrix(bomb_direction, K_NEAREST_BOMBS)
