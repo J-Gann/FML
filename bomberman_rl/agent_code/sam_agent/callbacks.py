@@ -119,7 +119,7 @@ def state_to_features(game_state: dict):
 
 def format_position(v):
     "Formats a 2d vector"
-    return f"{int(v[0]):2d}, {int(v[0]):2d}"
+    return f"{int(v[0]):2d}, {int(v[1]):2d}"
 
 
 def bool_to_str(b):
@@ -191,12 +191,13 @@ class OpponentDirections(Feature):
         others = game_state["others"]
 
         others_positions = np.array([other[3] for other in others])
+        print(others_positions)
         others_positions = pad_matrix(others_positions, 3)
         others_directions = others_positions - position
         return others_directions
 
     def explain_feature(self, feature_vector):
-        positions = [format_position(feature_vector[i : i + 2]) for i in range(3)]
+        positions = [format_position(feature_vector[i:i+2]) for i  in range(3)]
         return f"distances of opponents: {NEWLINE}    {(NEWLINE + '    ').join(positions)}"
 
 
