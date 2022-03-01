@@ -1,33 +1,3 @@
 digraph Tree {
 node [shape=box, fontname="helvetica"] ;
 edge [fontname="helvetica"] ;
-0 [label="move_up_possible <= 0.5\nsquared_error = 0.121\nsamples = 69\nvalue = 0.005"] ;
-1 [label="in_blast_zone <= 0.5\nsquared_error = 0.008\nsamples = 43\nvalue = -0.245"] ;
-0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
-2 [label="move_to_nearest_box_left <= 0.5\nsquared_error = 0.001\nsamples = 19\nvalue = -0.177"] ;
-1 -> 2 ;
-3 [label="squared_error = 0.001\nsamples = 17\nvalue = -0.183"] ;
-2 -> 3 ;
-4 [label="squared_error = -0.0\nsamples = 2\nvalue = -0.128"] ;
-2 -> 4 ;
-5 [label="boxes_in_range <= 3.5\nsquared_error = 0.006\nsamples = 24\nvalue = -0.299"] ;
-1 -> 5 ;
-6 [label="squared_error = 0.003\nsamples = 16\nvalue = -0.263"] ;
-5 -> 6 ;
-7 [label="squared_error = 0.004\nsamples = 8\nvalue = -0.371"] ;
-5 -> 7 ;
-8 [label="move_to_nearest_box_left <= 0.5\nsquared_error = 0.035\nsamples = 26\nvalue = 0.418"] ;
-0 -> 8 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
-9 [label="move_right_possible <= 0.5\nsquared_error = 0.02\nsamples = 22\nvalue = 0.473"] ;
-8 -> 9 ;
-10 [label="squared_error = 0.004\nsamples = 14\nvalue = 0.41"] ;
-9 -> 10 ;
-11 [label="squared_error = 0.03\nsamples = 8\nvalue = 0.584"] ;
-9 -> 11 ;
-12 [label="move_down_to_death <= 0.5\nsquared_error = 0.007\nsamples = 4\nvalue = 0.117"] ;
-8 -> 12 ;
-13 [label="squared_error = 0.003\nsamples = 3\nvalue = 0.159"] ;
-12 -> 13 ;
-14 [label="squared_error = 0.0\nsamples = 1\nvalue = -0.009"] ;
-12 -> 14 ;
-}

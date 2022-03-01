@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 import numpy as np
 from enum import Enum
+import copy
 
 class Actions(Enum):
     UP = 0
@@ -24,12 +25,13 @@ class FeatureExtraction():
         self.game_state = game_state
         self.field = self.game_state["field"]
         self.explosion_map = self.game_state["explosion_map"]
-        self.movement_graph = self._create_movement_graph()
         self.agent_node = self._to_node(self.game_state["self"][3])
         self.agent_index = self.game_state["self"][3]
         self.coins = game_state["coins"]
         self.bombs = game_state["bombs"]
         self.bomb_indices = [(bomb[0][0], bomb[0][1]) for bomb in self.bombs]
+        self.movement_graph = self._create_movement_graph()
+
 
     def _create_movement_graph(self):    
         row = []
@@ -55,7 +57,8 @@ class FeatureExtraction():
         is_wall = self.field[x, y] == -1
         is_box = self.field[x, y] == 1
         is_explosion = self.explosion_map[x, y] != 0
-        return is_wall or is_box or is_explosion or not in_range
+        is_bomb = (x, y) in self.bomb_indices and self.agent_index != (x, y)
+        return is_wall or is_box or is_explosion or not in_range or is_bomb
 
     def _node_in_movement_range(self, node):
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
@@ -125,6 +128,7 @@ class FeatureExtraction():
                 if s.COLS > x-i > 0: blast_indices.append((x-i, y))
                 if 0 < y+i < s.ROWS: blast_indices.append((x, y+i))
                 if s.ROWS > y-i > 0: blast_indices.append((x, y-i))
+        #print("blast_indices", blast_indices)
         return blast_indices
 
     def _blast_nodes(self):
@@ -162,7 +166,7 @@ class FeatureExtraction():
                     box_neighbors.append((nx, ny))
         if self.agent_index in box_neighbors:
             #print("move_to_nearest_box", Actions.WAIT)
-            return Actions.WAIT
+            return Actions.NONE
         step = self._next_step_to_nearest_index(box_neighbors)
         #print("move_to_nearest_box", step)
         return step
@@ -180,8 +184,12 @@ class FeatureExtraction():
 
     def FEATURE_in_blast_zone(self):
         blast_nodes = self._blast_nodes()
-        if self.agent_node in blast_nodes: return [1]
-        else: return [0]
+        if self.agent_node in blast_nodes:
+            #print("in_blast", [1])
+            return [1]
+        else:
+            #print("in_blast", [0])
+            return [0]
 
     def _action_new_index(self, action):
         # return the node an action puts the agent on
@@ -196,29 +204,68 @@ class FeatureExtraction():
         index = self._action_new_index(action)
         return self._to_node(index)
 
-    def FEATURE_action_possible(self):
+    def FEATURE_actions_possible(self):
         res = []
         for action in Actions:
             if action == Actions.NONE: pass
             elif action == Actions.WAIT: res.append(1)
             elif action == Actions.BOMB: res.append(int(self.game_state["self"][2]))
-            else: res.append(int(not self._index_obstructed(self._action_new_index(action))))
+            else: 
+                new_index = self._action_new_index(action)
+                obstructed = self._index_obstructed(new_index)
+                res.append(int(not obstructed))
         #print("moves_possible", res)
         #print("agent_index", self.agent_index)
         return res
+
+    def _action_possible(self, action):
+        if action == Actions.NONE: pass
+        elif action == Actions.WAIT: return True
+        elif action == Actions.BOMB: return self.game_state["self"][2]
+        else: 
+            new_index = self._action_new_index(action)
+            #print("agent_index", self.agent_index)
+            #print("new_index", new_index)
+            obstructed = self._index_obstructed(new_index)
+            return not obstructed
 
     def FEATURE_move_into_death(self):
         res = []
         for action in Actions:
             if action == Actions.NONE: pass
-            elif action == Actions.WAIT: res.append(int(self.agent_index in self._blast_indices()))
-            elif action == Actions.BOMB: res.append(int(self.agent_index in self._blast_indices()))
-            else: res.append(int(self._action_new_index(action) in self._blast_indices()))
+            elif action == Actions.WAIT or action == Actions.BOMB:
+                agent_index_blast_next_step = False
+                for bomb in self.game_state["bombs"]:
+                    (x, y) = bomb[0]
+                    time_till_explosion = bomb[1]
+                    blast_indices = []
+                    for i in range(4):
+                        if 0 < x+i < s.COLS: blast_indices.append((x+i, y))
+                        if s.COLS > x-i > 0: blast_indices.append((x-i, y))
+                        if 0 < y+i < s.ROWS: blast_indices.append((x, y+i))
+                        if s.ROWS > y-i > 0: blast_indices.append((x, y-i))
+                    if self.agent_index in blast_indices and time_till_explosion == 0: agent_index_blast_next_step = True
+                res.append(int(agent_index_blast_next_step))
+            else:
+                (nx, ny)  = self._action_new_index(action)
+                next_node_in_active_blast = not self.explosion_map[nx][ny] == 0
+                next_node_in_active_blast_next_step = False
+                for bomb in self.game_state["bombs"]:
+                    (x, y) = bomb[0]
+                    time_till_explosion = bomb[1]
+                    blast_indices = []
+                    for i in range(4):
+                        if 0 < x+i < s.COLS: blast_indices.append((x+i, y))
+                        if s.COLS > x-i > 0: blast_indices.append((x-i, y))
+                        if 0 < y+i < s.ROWS: blast_indices.append((x, y+i))
+                        if s.ROWS > y-i > 0: blast_indices.append((x, y-i))
+                    if (nx, ny) in blast_indices and time_till_explosion == 0: next_node_in_active_blast_next_step = True
+                res.append(int(next_node_in_active_blast or next_node_in_active_blast_next_step))
         #print("move_to_death", res)
         return res
 
     def FEATURE_could_escape_own_bomb(self):
-        old_bomb_indices = self.bomb_indices
+        old_bomb_indices = copy.deepcopy(self.bomb_indices)
         self.bomb_indices.append(self.agent_index)
         res = self.FEATURE_move_out_of_blast_zone() != Actions.NONE
         self.bomb_indices = old_bomb_indices
