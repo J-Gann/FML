@@ -230,4 +230,10 @@ def _rewards_from_events(self, feature_extraction, events, action):
     #print("coins reward", coins_reward)
     #print("######")
 
-    return general_movement_reward + bomb_reward + safety_reward + boxes_reward + coins_reward
+    movement_importance = 1
+    bomb_importance = 1
+    safety_importance = 2
+    box_importance = 1
+    coin_importance = 1
+
+    return movement_importance * general_movement_reward + bomb_importance * bomb_reward + safety_importance * safety_reward + box_importance * boxes_reward + coin_importance * coins_reward
