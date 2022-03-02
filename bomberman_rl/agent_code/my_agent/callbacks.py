@@ -31,7 +31,7 @@ def act(self, game_state: dict):
 
 def explore():
     choice = np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT', 'BOMB'])
-    print("RANDOM action selected", choice)
+    #print("RANDOM action selected", choice)
 
     return choice
 
@@ -48,7 +48,8 @@ def exploit(self, game_state):
         if(best_prediction_value < prediction):
             best_prediction_value = prediction
             best_prediction = action
+
     #print("##############")
-    print("action selected", best_prediction)
+    #print("action selected", best_prediction)
     return best_prediction
 
