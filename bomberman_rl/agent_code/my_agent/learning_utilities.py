@@ -278,6 +278,7 @@ def _rewards_from_events(self, feature_extraction, events, action):
         print("UNALLOWED ACTION ------------------------")
         general_movement_reward -= 1
 
+    # TODO: Detect circular actions in general
     if len(self.past_moves) > 2:
         if action == Actions.LEFT and Actions[self.past_moves[-2]] == Actions.RIGHT:
             print("twitch penalty >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
