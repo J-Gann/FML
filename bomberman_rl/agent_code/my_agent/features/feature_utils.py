@@ -1,9 +1,12 @@
 import numpy as np
 
-positions = np.empty((17, 17, 2))
+# TODO: import from settings
+COLS = 17
+ROWS = 17
+positions = np.empty((ROWS, COLS, 2))
 
-for i in range(17):
-    for j in range(17):
+for i in range(ROWS):
+    for j in range(COLS):
         positions[i][j][0] = i
         positions[i][j][1] = j
 

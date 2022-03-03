@@ -1,9 +1,19 @@
 from abc import ABCMeta, abstractmethod
+from typing import List, Tuple
+
+import math
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import dijkstra
+import numpy as np
+from enum import Enum
+import copy
+
+from .feature_utils import ROWS, COLS
 
 import numpy as np
 from enum import Enum, auto
 
-from feature_utils import (
+from .feature_utils import (
     crate_positions,
     format_boolean,
     format_position,
@@ -13,14 +23,6 @@ from feature_utils import (
     positions,
 )
 
-# TODO: actually import these settings
-# pythons import system is silly
-# from ...settings import BOMB_POWER, BOMB_TIMER
-# from bomberman_rl.settings import BOMB_TIMER
-
-BOMB_POWER = 3
-EXPLOSION_TIMER = 2
-
 ### feature extraction parameter ###
 
 K_NEAREST_CRATES = 1
@@ -29,10 +31,6 @@ K_NEAREST_EXPLOSIONS = 1
 K_NEAREST_BOMBS = 1
 
 ####################################
-
-
-# needed because of a problem with format strings and \n
-NEWLINE = "\n"
 
 
 class Feature(metaclass=ABCMeta):
@@ -185,7 +183,7 @@ class BombDirection(TwoDimensionalFeature):
         bomb_steps = np.array([bomb[1] for bomb in bombs])
         distances = manhattan_distance(position, bomb_positions)
 
-        within_range = (distances - bomb_steps - 1 - BOMB_POWER - EXPLOSION_TIMER) < 1
+        within_range = (distances - bomb_steps - 1 - s.BOMB_POWER - s.EXPLOSION_TIMER) < 1
         bomb_positions = bomb_positions[within_range]
         bomb_positions = k_closest(position, bomb_positions, k=K_NEAREST_BOMBS, pad=False)
 
