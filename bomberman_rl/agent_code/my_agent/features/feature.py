@@ -89,7 +89,9 @@ class ExplosionDirections(TwoDimensionalFeature):
         position = get_position(game_state)
 
         explosion_positions = positions[explosion_map == 1]
-        explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
+        explosion_positions = k_closest(
+            position, explosion_positions, k=K_NEAREST_EXPLOSIONS
+        )
         explosion_direction = explosion_positions - position
         return explosion_direction
 
@@ -133,7 +135,12 @@ class Walls(Feature):
         x, y = get_position(game_state)
         field = game_state["field"]
         # indicates whether top, left, down, right there is a wall next to agent
-        walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
+        walls = (
+            np.array(
+                [field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]
+            )
+            == -1
+        ).astype(np.int)
         return walls
 
     def explain_feature(self, feature_vector):
@@ -141,7 +148,10 @@ class Walls(Feature):
         return sep + sep.join(
             [
                 f"{dir}: {is_wall}"
-                for dir, is_wall in zip(["top", "left", "down", "right"], map(format_boolean, feature_vector))
+                for dir, is_wall in zip(
+                    ["top", "left", "down", "right"],
+                    map(format_boolean, feature_vector),
+                )
             ]
         )
 
@@ -183,9 +193,13 @@ class BombDirection(TwoDimensionalFeature):
         bomb_steps = np.array([bomb[1] for bomb in bombs])
         distances = manhattan_distance(position, bomb_positions)
 
-        within_range = (distances - bomb_steps - 1 - s.BOMB_POWER - s.EXPLOSION_TIMER) < 1
+        within_range = (
+            distances - bomb_steps - 1 - s.BOMB_POWER - s.EXPLOSION_TIMER
+        ) < 1
         bomb_positions = bomb_positions[within_range]
-        bomb_positions = k_closest(position, bomb_positions, k=K_NEAREST_BOMBS, pad=False)
+        bomb_positions = k_closest(
+            position, bomb_positions, k=K_NEAREST_BOMBS, pad=False
+        )
 
         bomb_direction = bomb_positions - position
         return pad_matrix(bomb_direction, K_NEAREST_BOMBS)

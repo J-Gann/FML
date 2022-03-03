@@ -29,7 +29,9 @@ def setup(self):
 def act(self, game_state: dict):
     print(game_state)
     if game_state["step"] == 1:
-        choice = np.random.choice(["RIGHT", "LEFT", "UP", "DOWN"])  # DO NOT PLACE BOMB IMMEDIATELY
+        choice = np.random.choice(
+            ["RIGHT", "LEFT", "UP", "DOWN"]
+        )  # DO NOT PLACE BOMB IMMEDIATELY
         return choice
     # Exploit or explore according to the exploration probability
     if np.random.randint(1, 100) / 100 < self.EPSILON:
