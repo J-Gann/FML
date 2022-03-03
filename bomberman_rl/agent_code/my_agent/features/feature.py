@@ -34,78 +34,89 @@ for i in range(17):
 
 
 class Feature(metaclass=ABCMeta):
-    @abstractmethod
-    def compute_feature(self, game_state):
-        pass
+    def __init__(self, name: str, description: str) -> None:
+        self.name = name
+        self.description = description
 
     @abstractmethod
-    def explain_feature(self, feature_vector):
+    def compute_feature(self, game_state: dict) -> np.array:
         pass
 
+    def format_feature(self, feature_vector: np.array) -> str:
+        return str(feature_vector)
 
-def format_position(v):
+    def explain_feature(self, feature_vector: np.array) -> str:
+        return f"{self.description}: {self.format_feature(feature_vector)}"
+
+
+def format_position(v: np.array) -> str:
     "Formats a 2d vector"
+
+    assert len(v.shape) == 1 and v.shape[0] == 2, "must be 2D"
+
     return f"{int(v[0]):2d}, {int(v[1]):2d}"
 
 
-def bool_to_str(b):
+def format_boolean(v: np.array) -> str:
     """takes bool or int, returns yes or no"""
-    if int(b) == 1:
+    assert len(v.shape) == 1 and v.shape[0] == 1, "must be scalar"
+
+    if int(v) == 1:
         return "yes"
     else:
         return "no"
 
 
-def get_position(game_state):
+def get_position(game_state: dict) -> np.array:
     return game_state["self"][-1]
 
 
 class TwoDimensionalFeature(Feature):
-    def explain_feature(self, feature_vector):
-        return f"{self.description}: {format_position(feature_vector)}"
+    def format_feature(self, feature_vector: np.array) -> str:
+        return format_position(feature_vector)
+
+
+class BooleanFeature(Feature):
+    def format_feature(self, feature_vector: np.array) -> str:
+        return format_boolean(feature_vector)
 
 
 class Position(TwoDimensionalFeature):
-    def __init__(self):
-        super().__init__()
-        self.description = "current position"
+    def __init__(self) -> None:
+        super().__init__("agent_position", "current position")
 
-    def compute_feature(self, game_state):
+    def compute_feature(self, game_state: dict) -> np.array:
         return np.array(get_position(game_state))
 
 
-class BombPossible(Feature):
-    def compute_feature(self, game_state):
+class BombPossible(BooleanFeature):
+    def __init__(self) -> None:
+        super().__init__("bomb_possible", "dropping bomb is possible")
+
+    def compute_feature(self, game_state: dict) -> np.array:
         bomb_possible = game_state["self"][-2]
         return np.array([int(bomb_possible)])
 
-    def explain_feature(self, feature_vector):
-        return f"bomb is possible: {bool_to_str(feature_vector[0])}"
-
 
 class ExplosionDirections(TwoDimensionalFeature):
-    def __init__(self):
-        super().__init__()
-        self.description = "direction of nearest explosion"
+    def __init__(self) -> None:
+        super().__init__("explosion_direction", "direction of nearest explosion")
 
-    def compute_feature(self, game_state):
+    def compute_feature(self, game_state: dict) -> np.array:
         explosion_map = game_state["explosion_map"].T
         position = get_position(game_state)
 
         explosion_positions = positions[explosion_map == 1]
-        explosion_positions = k_closest(
-            position, explosion_positions, k=K_NEAREST_EXPLOSIONS
-        )
+        explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
         explosion_direction = explosion_positions - position
         return explosion_direction
 
 
 class CoinDirections(TwoDimensionalFeature):
-    def __init__(self):
-        super().__init__()
-        self.description = "direction of nearest coin"
+    def __init__(self) -> None:
+        super().__init__("coin_direction", "direction of nearest coin")
 
-    def compute_feature(self, game_state):
+    def compute_feature(self, game_state: dict) -> np.array:
         position = get_position(game_state)
         coins = np.array(game_state["coins"])
         closest_coins = k_closest(position, coins, k=K_NEAREST_COINS)
@@ -114,49 +125,51 @@ class CoinDirections(TwoDimensionalFeature):
 
 
 class OpponentDirections(Feature):
-    def compute_feature(self, game_state):
+    def __init__(self) -> None:
+        super().__init__("opponent_direction", "distances of opponents")
+
+    def compute_feature(self, game_state: dict) -> np.array:
         position = get_position(game_state)
         others = game_state["others"]
 
         others_positions = np.array([other[3] for other in others])
-        print(others_positions)
         others_positions = pad_matrix(others_positions, 3)
         others_directions = others_positions - position
         return others_directions
 
-    def explain_feature(self, feature_vector):
+    def format_feature(self, feature_vector: np.array) -> str:
         positions = [format_position(feature_vector[i : i + 2]) for i in range(3)]
-        return (
-            f"distances of opponents: {NEWLINE}    {(NEWLINE + '    ').join(positions)}"
-        )
+        sep = "\n    "
+        return sep + sep.join(positions)
 
 
 class Walls(Feature):
-    def compute_feature(self, game_state):
+    def __init__(self) -> None:
+        super().__init__("walls", "wall to")
+
+    def compute_feature(self, game_state: dict) -> np.array:
         x, y = get_position(game_state)
         field = game_state["field"]
         # indicates whether top, left, down, right there is a wall next to agent
-        walls = (
-            np.array(
-                [field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]
-            )
-            == -1
-        ).astype(np.int)
+        walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
         return walls
 
     def explain_feature(self, feature_vector):
-        is_wall_str = map(bool_to_str, feature_vector)
-        directions = ["top", "left", "down", "right"]
+        sep = "\n    "
+        return sep + sep.join(
+            [
+                f"{dir}: {is_wall}"
+                for dir, is_wall in zip(["top", "left", "down", "right"], map(format_boolean, feature_vector))
+            ]
+        )
 
-        return f"""wall to: {NEWLINE}{NEWLINE.join([f"    {dir}: {is_wall}" for dir, is_wall in zip(directions, is_wall_str)])}"""
 
+# TODO: more than one crate
+class CrateDirection(TwoDimensionalFeature):
+    def __init__(self) -> None:
+        super().__init__("crate_direction", "direction of closest crate")
 
-class CrateDirections(TwoDimensionalFeature):
-    def __init__(self):
-        super().__init__()
-        self.description = "direction of closest crate"
-
-    def compute_feature(self, game_state):
+    def compute_feature(self, game_state: dict) -> np.array:
         position = get_position(game_state)
         field = game_state["field"]
 
@@ -165,12 +178,12 @@ class CrateDirections(TwoDimensionalFeature):
         return crates_direction
 
 
-class BombDirections(TwoDimensionalFeature):
-    def __init__(self):
-        super().__init__()
-        self.description = "direction of closest bomb"
+# TODO: more than one bomb
+class BombDirection(TwoDimensionalFeature):
+    def __init__(self) -> None:
+        super().__init__("bomb_direction", "direction of closest bomb")
 
-    def compute_feature(self, game_state):
+    def compute_feature(self, game_state: dict) -> np.array:
         """
         Bombs are only relevant in a radius of 7 boxes.
         Since it extends 3 in each direction and explodes after three steps.
@@ -190,9 +203,7 @@ class BombDirections(TwoDimensionalFeature):
 
         within_range = (distances - bomb_steps - 1 - BOMB_POWER - EXPLOSION_TIMER) < 1
         bomb_positions = bomb_positions[within_range]
-        bomb_positions = k_closest(
-            position, bomb_positions, k=K_NEAREST_BOMBS, pad=False
-        )
+        bomb_positions = k_closest(position, bomb_positions, k=K_NEAREST_BOMBS, pad=False)
 
         bomb_direction = bomb_positions - position
         return pad_matrix(bomb_direction, K_NEAREST_BOMBS)
