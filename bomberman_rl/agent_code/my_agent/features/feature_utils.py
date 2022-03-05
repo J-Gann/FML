@@ -1,4 +1,5 @@
 import numpy as np
+from actions import Actions
 
 # TODO: import from settings
 COLS = 17
@@ -56,3 +57,20 @@ def pad_matrix(mat, size):
     N = mat.shape[0]
     zero_rows_to_add = max(0, size - N)
     return np.concatenate([mat, np.zeros((zero_rows_to_add, 2))])
+
+
+def action_new_index(agent_position, action):
+    x, y = agent_position
+    # return the node an action puts the agent on
+    if action == Actions.UP:
+        return (x, y - 1)
+    elif action == Actions.DOWN:
+        return (x, y + 1)
+    elif action == Actions.LEFT:
+        return (x - 1, y)
+    elif action == Actions.RIGHT:
+        return (x + 1, y)
+    elif action == Actions.WAIT:
+        return agent_position
+    elif action == Actions.BOMB:
+        return agent_position
