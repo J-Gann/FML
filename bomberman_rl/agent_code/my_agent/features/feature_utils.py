@@ -1,5 +1,5 @@
 import numpy as np
-from actions import Actions
+from .actions import Actions
 import re
 
 # TODO: import from settings

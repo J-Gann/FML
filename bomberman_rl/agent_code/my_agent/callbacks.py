@@ -4,8 +4,6 @@ from enum import Enum
 from joblib import dump, load
 import os
 import math
-from .features.feature import FeatureExtraction, Actions
-
 
 EPSILON = 0
 MODEL_PATH = "model.joblib"
@@ -29,9 +27,7 @@ def setup(self):
 def act(self, game_state: dict):
     print(game_state)
     if game_state["step"] == 1:
-        choice = np.random.choice(
-            ["RIGHT", "LEFT", "UP", "DOWN"]
-        )  # DO NOT PLACE BOMB IMMEDIATELY
+        choice = np.random.choice(["RIGHT", "LEFT", "UP", "DOWN"])  # DO NOT PLACE BOMB IMMEDIATELY
         return choice
     # Exploit or explore according to the exploration probability
     if np.random.randint(1, 100) / 100 < self.EPSILON:
@@ -56,10 +52,7 @@ def exploit(self, game_state):
         action = action.name
         features = np.array(features_from_game_state(self, feature_extration))
         prediction = self.trees[action].predict(features.reshape(1, -1))
-        # print(action, features, prediction)
         if best_prediction_value < prediction:
             best_prediction_value = prediction
             best_prediction = action
-    # print("##############")
-    # print("action selected", best_prediction)
     return best_prediction

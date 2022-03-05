@@ -7,15 +7,13 @@ from scipy.sparse.csgraph import dijkstra
 import numpy as np
 from enum import Enum
 import copy
-from movement_graph import MovementGraph, Actions, bomb_indices, to_node
+from .movement_graph import MovementGraph, to_node
 
-
-from feature_utils import ROWS, COLS, action_new_index, agent_position, camel_to_snake_case
 
 import numpy as np
 from enum import Enum, auto
 
-from feature_utils import (
+from .feature_utils import (
     crate_positions,
     format_boolean,
     format_position,
@@ -23,6 +21,11 @@ from feature_utils import (
     manhattan_distance,
     pad_matrix,
     positions,
+    ROWS,
+    COLS,
+    action_new_index,
+    agent_position,
+    camel_to_snake_case,
 )
 
 ### feature extraction parameter ###

@@ -1,4 +1,3 @@
-from .features.movement_graph import FeatureExtraction, Actions
 import events as e
 import numpy as np
 import os
@@ -86,16 +85,9 @@ def setup_learning_features(self, load_model=True):
 
 def _action_value_data(trees, old_features, self_action, new_features, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1))
-    predicted_future_reward = np.max(
-        [
-            trees[action_tree].predict(new_features.reshape(1, -1))
-            for action_tree in trees
-        ]
-    )
+    predicted_future_reward = np.max([trees[action_tree].predict(new_features.reshape(1, -1)) for action_tree in trees])
     predicted_action_value = trees[self_action].predict(old_features.reshape(1, -1))
-    q_value_update = (
-        rewards + DISCOUNT * predicted_future_reward - predicted_action_value
-    )
+    q_value_update = rewards + DISCOUNT * predicted_future_reward - predicted_action_value
     q_value = current_guess + LEARNING_RATE * q_value_update
     return q_value
 
@@ -104,9 +96,7 @@ def _action_value_data_last_step(trees, old_features, self_action, rewards):
     current_guess = trees[self_action].predict(old_features.reshape(1, -1))
     predicted_future_reward = 0
     predicted_action_value = trees[self_action].predict(old_features.reshape(1, -1))
-    q_value_update = (
-        rewards + DISCOUNT * predicted_future_reward - predicted_action_value
-    )
+    q_value_update = rewards + DISCOUNT * predicted_future_reward - predicted_action_value
     q_value = current_guess + LEARNING_RATE * q_value_update
     return q_value
 
@@ -140,10 +130,7 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
         state_new = self.n_states_new[-1]
         q_value_update += DISCOUNT ** (N_STEP + 1) * np.max(
-            [
-                self.trees[action_tree].predict(state_new.reshape(1, -1))
-                for action_tree in self.trees
-            ]
+            [self.trees[action_tree].predict(state_new.reshape(1, -1)) for action_tree in self.trees]
         )
         # print("q_value", q_value)
 
@@ -189,10 +176,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
         if len(self.n_states_new) > 0:
             state_new = self.n_states_new[-1]
             q_value_update += DISCOUNT ** (N_STEP + 1) * np.max(
-                [
-                    self.trees[action_tree].predict(state_new.reshape(1, -1))
-                    for action_tree in self.trees
-                ]
+                [self.trees[action_tree].predict(state_new.reshape(1, -1)) for action_tree in self.trees]
             )
             # print("q_value", q_value)
 
@@ -291,19 +275,11 @@ def _rewards_from_events(self, feature_extraction, events, action):
 
     # GENERAL MOVEMENT
     general_movement_reward = 0
-    if (
-        feature_extraction._action_possible(action)
-        and action != Actions.WAIT
-        and action != Actions.BOMB
-    ):
+    if feature_extraction._action_possible(action) and action != Actions.WAIT and action != Actions.BOMB:
         pass  # general_movement_reward += 1   # Did an allowed move
     else:
         general_movement_reward -= 1  # Did a not allowed move
-    if (
-        action == Actions.WAIT
-        and (action_to_coin != Actions.NONE or action_to_box != Actions.NONE)
-        and not in_blast[0]
-    ):
+    if action == Actions.WAIT and (action_to_coin != Actions.NONE or action_to_box != Actions.NONE) and not in_blast[0]:
         general_movement_reward -= 1  # Did wait although there was no need to
     if not feature_extraction._action_possible(action):
         general_movement_reward -= 1
@@ -318,9 +294,7 @@ def _rewards_from_events(self, feature_extraction, events, action):
         if action == Actions.DOWN and Actions[self.past_moves[-2]] == Actions.UP:
             general_movement_reward -= 1  # Do not reward switching between two nodes
 
-    general_movement_reward = max(
-        0, general_movement_reward
-    )  # Do not penalize below -1
+    general_movement_reward = max(0, general_movement_reward)  # Do not penalize below -1
 
     # BOMBS
     bomb_reward = 0
@@ -348,12 +322,7 @@ def _rewards_from_events(self, feature_extraction, events, action):
         safety_reward -= 1  # Did move into certain death
     else:
         safety_reward += 1  # Did not move into certain death
-    if (
-        action == Actions.WAIT
-        and not in_blast[0]
-        and action_to_coin == Actions.NONE
-        and action_to_box == Actions.NONE
-    ):
+    if action == Actions.WAIT and not in_blast[0] and action_to_coin == Actions.NONE and action_to_box == Actions.NONE:
         safety_reward += 1  # If there there are no paths to either boxes or coins and the agent is not in a plast, he is probably cornered by a blast
     # safety_reward = max(0, safety_reward) # Do not penalize below -1
 
