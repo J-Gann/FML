@@ -238,7 +238,7 @@ def _rewards_from_events(self, feature_extraction, events, action, score_diff):
     #print("safety", action_to_safety)
     #print("box", action_to_box)
     #print("blast boxes", blast_boxes)
-
+    #print("bomb good", bomb_good)
     if action_to_safety != Actions.NONE:
         if action == action_to_safety: rewards += 1
         else: rewards -= 1
