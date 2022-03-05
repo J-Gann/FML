@@ -1,6 +1,4 @@
 
-from argparse import Action
-from tkinter.messagebox import NO
 from .path_utilities import FeatureExtraction, Actions
 import events as e
 import numpy as np
@@ -15,7 +13,7 @@ DISCOUNT = 0.95
 LEARNING_RATE = 0.01
 EPSILON = 1
 EPSILON_MIN = 0.05
-EPSILON_DECREASE_RATE = 0.96
+EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 N_STEP = 6
 
@@ -237,93 +235,24 @@ def _rewards_from_events(self, feature_extraction, events, action, score_diff):
 
     can_place_bomb = feature_extraction._action_possible(Actions.BOMB)
 
-    # Go to a box if no path to a coin exists
-    if action_to_coin == Actions.NONE and action == action_to_box: rewards += 1
-    elif action == action_to_box: rewards -= 1
-    # Go to a coin if one exists (whether or not a path to a box exists)
-    if action_to_coin != Actions.NONE and action == action_to_coin: rewards += 1
-    elif action == action_to_coin: rewards -= 1
-    # If no path to a coin exists and there are boxes in the blast zone and a bomb can be placed and the bomb wont kill the agent, place a bomb
-    if action_to_coin == Actions.NONE and blast_boxes > 0 and can_place_bomb and bomb_good and action == Actions.BOMB: rewards += 1#blast_boxes
-    elif action == Actions.BOMB: rewards -= 1
-    # If no path to neither a coin nor a box exists, wait
-    if action_to_coin == Actions.NONE and action_to_box == Actions.NONE and action == Actions.WAIT: rewards += 1
-    elif action == Actions.WAIT: rewards -= 1
-    # If the agent is in a blast zone, move to safety
-    if in_blast and action == action_to_safety: rewards += 1
-    if in_blast and action != action_to_safety: rewards -= 1
-    if not feature_extraction._action_possible(action): rewards -= 1
+    #print("safety", action_to_safety)
+    #print("box", action_to_box)
+    #print("blast boxes", blast_boxes)
 
+    if action_to_safety != Actions.NONE:
+        if action == action_to_safety: rewards += 1
+        else: rewards -= 1
+    elif action_to_coin != Actions.NONE:
+        if action == action_to_coin: rewards += 1
+        else: rewards -= 1
+    elif can_place_bomb and bomb_good and blast_boxes > 0:
+        if action == Actions.BOMB: rewards += 1
+        else: rewards -= 1
+    elif action_to_box != Actions.NONE:
+        if action == action_to_box: rewards += 1
+        else: rewards -= 1
+    else:
+        rewards -= 1 # Do something
 
-
-    #print(action_to_coin, action_to_box, blast_boxes, in_blast, action_to_safety, bomb_good)
-    #print(rewards)
     print(rewards)
-    if rewards == 0: return -1 # Do some shit
-    return rewards # + 10 * score_diff
-"""
-
-    # GENERAL MOVEMENT
-    general_movement_reward = 0
-    if feature_extraction._action_possible(action) and action != Actions.WAIT and action != Actions.BOMB: pass# general_movement_reward += 1   # Did an allowed move
-    else: general_movement_reward -= 1  # Did a not allowed move
-    if action == Actions.WAIT and (action_to_coin != Actions.NONE or action_to_box != Actions.NONE) and not in_blast[0]: general_movement_reward -= 1  # Did wait although there was no need to
-    if action == Actions.WAIT and action_to_coin != Actions.NONE  and not in_blast[0] and feature_extraction._action_possible(Actions.BOMB): general_movement_reward -= 1  # Did wait although we could have placed a bomb next to a crate
-    if not feature_extraction._action_possible(action): general_movement_reward -= 1
-
-    # TODO: Detect circular actions in general
-    if len(self.past_moves) > 2:
-        if action == Actions.LEFT and Actions[self.past_moves[-2]] == Actions.RIGHT: general_movement_reward -= 2   # Do not reward switching between two nodes
-        if action == Actions.RIGHT and Actions[self.past_moves[-2]] == Actions.LEFT: general_movement_reward -= 2   # Do not reward switching between two nodes
-        if action == Actions.UP and Actions[self.past_moves[-2]] == Actions.DOWN: general_movement_reward -= 2   # Do not reward switching between two nodes
-        if action == Actions.DOWN and Actions[self.past_moves[-2]] == Actions.UP: general_movement_reward -= 2   # Do not reward switching between two nodes
-
-    general_movement_reward = max(-1, general_movement_reward) # Do not penalize below -1
-
-    # BOMBS
-    bomb_reward = 0
-    if e.BOMB_DROPPED in events: pass#bomb_reward += 1   # Generally give a bonus for dropping bombs
-    if e.KILLED_SELF in events: bomb_reward -= 1   # Strike bomb bonus if bomb killed agent
-    if action == Actions.BOMB and not feature_extraction._action_possible(action): bomb_reward -= 1
-    if action == Actions.BOMB and not bomb_good[0]: bomb_reward -= 1   # Strike bomb bonus if bomb will eventually kill agent
-    if action == Actions.BOMB and bomb_good[0] and blast_boxes[0] > 0: bomb_reward += 1 # Bomb will have an effect
-    else: bomb_reward -= 1 # Bomb will have no effect
-    if len(self.last_bomb_position) > 2:
-        if action == Actions.BOMB and self.last_bomb_position[-2] == feature_extraction.agent_index: bomb_reward -= 1 # Placed a bomb at the same place as previously
-
-    bomb_reward = max(0, bomb_reward) # Do not penalize below -1
-
-    # SAFETY
-    safety_reward = 0
-    if in_blast[0] and action == action_to_safety: safety_reward += 1  # Did move towards safety when necessary
-    else: safety_reward -= 1   # Did not move towards safety when necessary
-    if action == Actions.WAIT and not in_blast[0] and action_to_coin == Actions.NONE and action_to_box == Actions.NONE: safety_reward += 1  # If there there are no paths to either boxes or coins and the agent is not in a plast, he is probably cornered by a blast
-    safety_reward = max(0, safety_reward) # Do not penalize below -1
-
-    # BOXES
-    boxes_reward = 0
-    if not in_blast[0] and action == action_to_box: boxes_reward += 1  # Did move towards box when not in danger
-    else: boxes_reward -= 1   # Did not move towards safety when necessary
-    boxes_reward = max(0, boxes_reward) # Do not penalize below -1
-
-    # COINS
-    coins_reward = 0
-    if not in_blast[0] and action == action_to_coin: coins_reward += 1  # Did move towards coin when not in danger
-    else: coins_reward -= 1   # Did not move towards safety when necessary
-    coins_reward = max(0, coins_reward) # Do not penalize below -1
-
-    movement_importance = 1
-    bomb_importance = 4 # can place bomb only every 4 rounds
-    safety_importance = 4
-    box_importance = 1
-    coin_importance = 1
-
-    other_rewards = 0
-
-    if e.SURVIVED_ROUND in events:
-        #other_rewards += 100
-        pass
-    if e.COIN_COLLECTED in events:
-        other_rewards += 1
-    return movement_importance * general_movement_reward + bomb_importance * bomb_reward + safety_importance * safety_reward + box_importance * boxes_reward + coin_importance * coins_reward + other_rewards
-"""
+    return rewards + 10 * score_diff

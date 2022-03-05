@@ -177,7 +177,7 @@ class FeatureExtraction():
                     box_neighbors.append((nx, ny))
         if self.agent_index in box_neighbors:
             #print("move_to_nearest_box", Actions.WAIT)
-            return Actions.NONE
+            return Actions.WAIT
         step = self._next_step_to_nearest_index(box_neighbors)
         #print("move_to_nearest_box", step)
         #print(step)
@@ -187,9 +187,16 @@ class FeatureExtraction():
         sum = 0
         x, y = self.agent_index
         for i in range(4):
+            if self.field[x+i, y] == -1: break
             if 0 < x+i < s.COLS and self.field[x+i, y] == 1: sum+= 1
+        for i in range(4):
+            if self.field[x-i, y] == -1: break
             if s.COLS > x-i > 0 and self.field[x-i, y] == 1: sum+= 1
+        for i in range(4):
+            if self.field[x, y+i] == -1: break
             if 0 < y+i < s.ROWS and self.field[x, y+i] == 1: sum+= 1
+        for i in range(4):
+            if self.field[x, y-i] == -1: break
             if s.ROWS > y-i > 0 and self.field[x, y-i] == 1: sum+= 1
         #print("boxes_in_blast",sum)
         return [sum]
@@ -247,6 +254,7 @@ class FeatureExtraction():
         self.bomb_indices = old_bomb_indices
         #print("bomb_good", res)
         return [res]
+
 '''
 def print_field(field):
     print(" ", end="")
