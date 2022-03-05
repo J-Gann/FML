@@ -50,6 +50,10 @@ class Feature(metaclass=ABCMeta):
         return self.name().replace("_", " ")
 
     @abstractmethod
+    def dim(self) -> int:
+        pass
+
+    @abstractmethod
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         pass
 
@@ -61,20 +65,29 @@ class Feature(metaclass=ABCMeta):
 
 
 class TwoDimensionalFeature(Feature):
+    def dim(self) -> int:
+        return 2
+
     def format_feature(self, feature_vector: np.array) -> str:
         return format_position(feature_vector)
 
 
 class BooleanFeature(Feature):
+    def dim(self) -> int:
+        return 1
+
     def format_feature(self, feature_vector: np.array) -> str:
         return format_boolean(feature_vector)
 
 
 class ActionFeature(Feature):
+    def dim(self) -> int:
+        return 1
+
     def format_feature(self, feature_vector: np.array) -> str:
         assert len(feature_vector.shape) == 1 and feature_vector.shape[0] == 1, "must be scalar"
 
-        return list(Actions)[feature_vector[0]].name
+        return list(Actions)[int(feature_vector[0])].name
 
 
 class AgentPosition(TwoDimensionalFeature):
@@ -110,12 +123,19 @@ class CoinDirections(TwoDimensionalFeature):
 
 
 class OpponentDirections(Feature):
+    def __init__(self, number_of_opponents=3) -> None:
+        super().__init__()
+        self.number_of_opponents = number_of_opponents
+
+    def dim(self) -> int:
+        return 2 * self.number_of_opponents
+
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         position = get_agent_position(game_state)
         others = game_state["others"]
 
         others_positions = np.array([other[3] for other in others])
-        others_positions = pad_matrix(others_positions, 3)
+        others_positions = pad_matrix(others_positions, self.number_of_opponents)
         others_directions = others_positions - position
         return others_directions
 
@@ -126,6 +146,9 @@ class OpponentDirections(Feature):
 
 
 class Walls(Feature):
+    def dim(self) -> int:
+        return 4
+
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         x, y = get_agent_position(game_state)
         field = game_state["field"]
@@ -133,15 +156,12 @@ class Walls(Feature):
         walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
         return walls
 
-    def explain_feature(self, feature_vector):
+    def format_feature(self, feature_vector):
         sep = "\n    "
         return sep + sep.join(
             [
                 f"{dir}: {is_wall}"
-                for dir, is_wall in zip(
-                    ["top", "left", "down", "right"],
-                    map(format_boolean, feature_vector),
-                )
+                for dir, is_wall in zip(["top", "left", "down", "right"], map(format_boolean, feature_vector))
             ]
         )
 
@@ -230,6 +250,9 @@ class MoveNextToNearestBox(ActionFeature):
 
 
 class BoxesInBlastRange(Feature):
+    def dim(self) -> int:
+        return 1
+
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         sum = 0
         x, y = get_agent_position(game_state)
@@ -254,6 +277,9 @@ class AgentInBlastZone(BooleanFeature):
 
 
 class PossibleActions(Feature):
+    def dim(self) -> int:
+        return len(Actions) - 1
+
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         agent_position = get_agent_position(game_state)
         res = []
@@ -272,6 +298,9 @@ class PossibleActions(Feature):
 
 
 class MoveIntoDeath(Feature):
+    def dim(self) -> int:
+        return len(Actions) - 1
+
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         res = []
         for action in Actions:
@@ -319,7 +348,7 @@ class MoveIntoDeath(Feature):
         return np.array(res)
 
 
-class CouldEscapeOwnBomb(Feature):
+class CouldEscapeOwnBomb(BooleanFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         old_bomb_indices = copy.deepcopy(movement_graph.bomb_indices)
         movement_graph.bomb_indices.append(get_agent_position(game_state))
@@ -329,7 +358,7 @@ class CouldEscapeOwnBomb(Feature):
         movement_graph.bomb_indices = old_bomb_indices
         self.bomb_indices = old_bomb_indices
 
-        return np.array([res])
+        return np.array([int(res)])
 
 
 example_game_state = {
@@ -691,32 +720,29 @@ example_game_state = {
 }
 
 
-class FeatureCollector:
+class FeatureCollector(Feature):
     def __init__(self, *features: List[Feature]):
         self.features: List[Feature] = features
 
-    def collect(self, game_state):
+    def dim(self) -> int:
+        return sum(f.dim() for f in self.features)
+
+    def compute_feature(self, game_state: dict, movement_graph: MovementGraph = None) -> np.array:
         movement_graph = MovementGraph(game_state)
         vecs = [f.compute_feature(game_state, movement_graph).flatten() for f in self.features]
 
         return np.concatenate(vecs)
 
+    def explain_feature(self, feature_vector: np.array) -> str:
+        explainations = []
 
-fc = FeatureCollector(
-    AgentPosition(),
-    BombDropPossible(),
-    ExplosionDirections(),
-    CoinDirections(),
-    OpponentDirections(),
-    Walls(),
-    CrateDirection(),
-    BombDirection(),
-    MoveToNearestCoin(),
-    MoveOutOfBlastZone(),
-    MoveNextToNearestBox(),
-    BoxesInBlastRange(),
-    AgentInBlastZone(),
-    PossibleActions(),
-    MoveIntoDeath(),
-    CouldEscapeOwnBomb(),
-)
+        index = 0
+        for f in self.features:
+            v = feature_vector[index : index + f.dim()]
+            explainations.append(f.explain_feature(v))
+            index += f.dim()
+
+        return "\n".join(explainations)
+
+    def print_feature_summary(self, feature_vector):
+        print(self.explain_feature(feature_vector))

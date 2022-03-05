@@ -1,3 +1,4 @@
+import numbers
 import numpy as np
 from .actions import Actions
 import re
@@ -23,7 +24,7 @@ def format_position(v: np.array) -> str:
 
 def format_boolean(v: np.array) -> str:
     """takes bool or int, returns yes or no"""
-    assert len(v.shape) == 1 and v.shape[0] == 1, "must be scalar"
+    assert isinstance(v, numbers.Number) or (len(v.shape) == 1 and v.shape[0] == 1), "must be scalar"
 
     if int(v) == 1:
         return "yes"

@@ -61,7 +61,7 @@ def explore():
 
 
 def exploit(self, game_state):
-    feature_collector = fc = FeatureCollector(
+    feature_collector = FeatureCollector(
         AgentPosition(),
         BombDropPossible(),
         ExplosionDirections(),
@@ -84,7 +84,8 @@ def exploit(self, game_state):
     best_prediction_value = -math.inf
     for action in Actions:
         action = action.name
-        features = feature_collector.collect(game_state)
+        features = feature_collector.compute_feature(game_state)
+        feature_collector.print_feature_summary(features)
         prediction = self.trees[action].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction
