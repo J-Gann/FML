@@ -1,5 +1,6 @@
 import numpy as np
 from actions import Actions
+import re
 
 # TODO: import from settings
 COLS = 17
@@ -74,3 +75,15 @@ def action_new_index(agent_position, action):
         return agent_position
     elif action == Actions.BOMB:
         return agent_position
+
+
+def agent_position(game_state: dict) -> np.array:
+    return game_state["self"][-1]
+
+
+def camel_to_snake_case(s):
+    return re.sub("(?!^)([A-Z]+)", r"_\1", s).lower()
+
+
+def snake_to_camel_case(s):
+    return re.sub("(^|_)(.)", lambda x: x.group(2).upper(), s)

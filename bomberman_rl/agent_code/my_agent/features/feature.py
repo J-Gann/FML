@@ -9,7 +9,8 @@ from enum import Enum
 import copy
 from movement_graph import MovementGraph, Actions, bomb_indices, to_node
 
-from feature_utils import ROWS, COLS, action_new_index
+
+from feature_utils import ROWS, COLS, action_new_index, agent_position, camel_to_snake_case
 
 import numpy as np
 from enum import Enum, auto
@@ -35,9 +36,11 @@ K_NEAREST_BOMBS = 1
 
 
 class Feature(metaclass=ABCMeta):
-    def __init__(self, name: str, description: str) -> None:
-        self.name = name
-        self.description = description
+    def name(self):
+        return camel_to_snake_case(type(self).__name__)
+
+    def description(self):
+        return self.name().replace("_", " ")
 
     @abstractmethod
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
@@ -47,11 +50,7 @@ class Feature(metaclass=ABCMeta):
         return str(feature_vector)
 
     def explain_feature(self, feature_vector: np.array) -> str:
-        return f"{self.description}: {self.format_feature(feature_vector)}"
-
-
-def agent_position(game_state: dict) -> np.array:
-    return game_state["self"][-1]
+        return f"{self.description()}: {self.format_feature(feature_vector)}"
 
 
 class TwoDimensionalFeature(Feature):
@@ -71,27 +70,19 @@ class ActionFeature(Feature):
         return list(Actions)[feature_vector[0]].name
 
 
-class Position(TwoDimensionalFeature):
-    def __init__(self) -> None:
-        super().__init__("agent_position", "current position")
-
+class AgentPosition(TwoDimensionalFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         return np.array(agent_position(game_state))
 
 
-class BombPossible(BooleanFeature):
-    def __init__(self) -> None:
-        super().__init__("bomb_possible", "dropping bomb is possible")
-
+class BombDropPossible(BooleanFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         bomb_possible = game_state["self"][-2]
         return np.array([int(bomb_possible)])
 
 
+# TODO: more than one field
 class ExplosionDirections(TwoDimensionalFeature):
-    def __init__(self) -> None:
-        super().__init__("explosion_direction", "direction of nearest explosion")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         explosion_map = game_state["explosion_map"].T
         position = agent_position(game_state)
@@ -103,9 +94,6 @@ class ExplosionDirections(TwoDimensionalFeature):
 
 
 class CoinDirections(TwoDimensionalFeature):
-    def __init__(self) -> None:
-        super().__init__("coin_direction", "direction of nearest coin")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         position = agent_position(game_state)
         coins = np.array(game_state["coins"])
@@ -115,9 +103,6 @@ class CoinDirections(TwoDimensionalFeature):
 
 
 class OpponentDirections(Feature):
-    def __init__(self) -> None:
-        super().__init__("opponent_direction", "distances of opponents")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         position = agent_position(game_state)
         others = game_state["others"]
@@ -134,9 +119,6 @@ class OpponentDirections(Feature):
 
 
 class Walls(Feature):
-    def __init__(self) -> None:
-        super().__init__("walls", "wall to")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         x, y = agent_position(game_state)
         field = game_state["field"]
@@ -159,9 +141,6 @@ class Walls(Feature):
 
 # TODO: more than one crate
 class CrateDirection(TwoDimensionalFeature):
-    def __init__(self) -> None:
-        super().__init__("crate_direction", "direction of closest crate")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         position = agent_position(game_state)
         field = game_state["field"]
@@ -173,9 +152,6 @@ class CrateDirection(TwoDimensionalFeature):
 
 # TODO: more than one bomb
 class BombDirection(TwoDimensionalFeature):
-    def __init__(self) -> None:
-        super().__init__("bomb_direction", "direction of closest bomb")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         """
         Bombs are only relevant in a radius of 7 boxes.
@@ -203,9 +179,6 @@ class BombDirection(TwoDimensionalFeature):
 
 
 class MoveToNearestCoin(ActionFeature):
-    def __init__(self) -> None:
-        super().__init__("move_to_nearest_coin", "move to nearest coin")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         return movement_graph.next_step_to_nearest_index(game_state["coins"])
 
@@ -229,9 +202,6 @@ def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph):
 
 
 class MoveOutOfBlastZone(ActionFeature):
-    def __init__(self) -> None:
-        super().__init__("move_out_of_blast_zone", "move out of blast zone")
-
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         return move_out_of_blast_zone(game_state, movement_graph)
 
