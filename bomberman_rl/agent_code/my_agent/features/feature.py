@@ -8,7 +8,11 @@ import numpy as np
 from enum import Enum
 import copy
 from .movement_graph import MovementGraph, to_node
+from .actions import Actions
 
+BOMB_POWER = 3
+BOMB_TIMER = 4
+EXPLOSION_TIMER = 2
 
 import numpy as np
 from enum import Enum, auto
@@ -24,7 +28,7 @@ from .feature_utils import (
     ROWS,
     COLS,
     action_new_index,
-    agent_position,
+    get_agent_position,
     camel_to_snake_case,
 )
 
@@ -75,7 +79,7 @@ class ActionFeature(Feature):
 
 class AgentPosition(TwoDimensionalFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        return np.array(agent_position(game_state))
+        return np.array(get_agent_position(game_state))
 
 
 class BombDropPossible(BooleanFeature):
@@ -88,7 +92,7 @@ class BombDropPossible(BooleanFeature):
 class ExplosionDirections(TwoDimensionalFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         explosion_map = game_state["explosion_map"].T
-        position = agent_position(game_state)
+        position = get_agent_position(game_state)
 
         explosion_positions = positions[explosion_map == 1]
         explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
@@ -98,7 +102,7 @@ class ExplosionDirections(TwoDimensionalFeature):
 
 class CoinDirections(TwoDimensionalFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        position = agent_position(game_state)
+        position = get_agent_position(game_state)
         coins = np.array(game_state["coins"])
         closest_coins = k_closest(position, coins, k=K_NEAREST_COINS)
         coin_directions = closest_coins - position
@@ -107,7 +111,7 @@ class CoinDirections(TwoDimensionalFeature):
 
 class OpponentDirections(Feature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        position = agent_position(game_state)
+        position = get_agent_position(game_state)
         others = game_state["others"]
 
         others_positions = np.array([other[3] for other in others])
@@ -123,7 +127,7 @@ class OpponentDirections(Feature):
 
 class Walls(Feature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        x, y = agent_position(game_state)
+        x, y = get_agent_position(game_state)
         field = game_state["field"]
         # indicates whether top, left, down, right there is a wall next to agent
         walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
@@ -145,7 +149,7 @@ class Walls(Feature):
 # TODO: more than one crate
 class CrateDirection(TwoDimensionalFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        position = agent_position(game_state)
+        position = get_agent_position(game_state)
         field = game_state["field"]
 
         nearest_crates = k_closest(position, crate_positions(field), k=K_NEAREST_CRATES)
@@ -163,7 +167,7 @@ class BombDirection(TwoDimensionalFeature):
 
         Vector has dimension 4 x 2 and is filled with zeros.
         """
-        position = agent_position(game_state)
+        position = get_agent_position(game_state)
         bombs = game_state["bombs"]
 
         if len(bombs) == 0:
@@ -183,11 +187,11 @@ class BombDirection(TwoDimensionalFeature):
 
 class MoveToNearestCoin(ActionFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        return movement_graph.next_step_to_nearest_index(game_state["coins"])
+        return np.array([movement_graph.next_step_to_nearest_index(game_state["coins"]).value])
 
 
 def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph):
-    agent_position = agent_position(game_state)
+    agent_position = get_agent_position(game_state)
     free_indices = []
     blast_indices = movement_graph.blast_indices()
 
@@ -199,9 +203,9 @@ def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph):
             if not obstructed and not in_blast_zone:
                 free_indices.append(index)
     if agent_position in blast_indices:
-        return movement_graph.next_step_to_nearest_index(free_indices)
+        return np.array([movement_graph.next_step_to_nearest_index(free_indices).value])
     else:
-        return Actions.NONE
+        return np.array([Actions.NONE.value])
 
 
 class MoveOutOfBlastZone(ActionFeature):
@@ -220,16 +224,15 @@ class MoveNextToNearestBox(ActionFeature):
             for nx, ny in neighbors:
                 if not movement_graph.index_obstructed((nx, ny)):
                     box_neighbors.append((nx, ny))
-        if agent_position(game_state) in box_neighbors:
-            return Actions.NONE
-        step = movement_graph.next_step_to_nearest_index(box_neighbors)
-        return step
+        if get_agent_position(game_state) in box_neighbors:
+            return np.array([Actions.NONE.value])
+        return np.array([movement_graph.next_step_to_nearest_index(box_neighbors).value])
 
 
 class BoxesInBlastRange(Feature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         sum = 0
-        x, y = agent_position(game_state)
+        x, y = get_agent_position(game_state)
         field = game_state["field"]
 
         for i in range(4):
@@ -246,12 +249,13 @@ class BoxesInBlastRange(Feature):
 
 class AgentInBlastZone(BooleanFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        in_blast_zone = to_node(agent_position(game_state)) in movement_graph.blast_nodes()
+        in_blast_zone = to_node(get_agent_position(game_state)) in movement_graph.blast_nodes()
         return np.array([int(in_blast_zone)])
 
 
 class PossibleActions(Feature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
+        agent_position = get_agent_position(game_state)
         res = []
         for action in Actions:
             if action == Actions.NONE:
@@ -261,8 +265,8 @@ class PossibleActions(Feature):
             elif action == Actions.BOMB:
                 res.append(int(game_state["self"][2]))
             else:
-                new_index = action_new_index(action)
-                obstructed = self.movement_graph.index_obstructed(new_index)
+                new_index = action_new_index(agent_position, action)
+                obstructed = movement_graph.index_obstructed(new_index)
                 res.append(int(not obstructed))
         return np.array(res)
 
@@ -292,6 +296,7 @@ class MoveIntoDeath(Feature):
                         agent_index_blast_next_step = True
                 res.append(int(agent_index_blast_next_step))
             else:
+                # FIXME: this should not unpack action
                 (nx, ny) = action
                 next_node_in_active_blast = not self.explosion_map[nx][ny] == 0
                 next_node_in_active_blast_next_step = False
@@ -317,9 +322,9 @@ class MoveIntoDeath(Feature):
 class CouldEscapeOwnBomb(Feature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         old_bomb_indices = copy.deepcopy(movement_graph.bomb_indices)
-        movement_graph.bomb_indices.append(agent_position(game_state))
+        movement_graph.bomb_indices.append(get_agent_position(game_state))
 
-        res = self.FEATURE_move_out_of_blast_zone() != Actions.NONE
+        res = move_out_of_blast_zone(game_state, movement_graph) != Actions.NONE
 
         movement_graph.bomb_indices = old_bomb_indices
         self.bomb_indices = old_bomb_indices
@@ -685,7 +690,27 @@ example_game_state = {
     ),
 }
 
-features = [
+
+class FeatureCollector:
+    def __init__(self, *features: List[Feature]):
+        self.features: List[Feature] = features
+
+    def collect(self, game_state):
+        movement_graph = MovementGraph(game_state)
+        vecs = [f.compute_feature(game_state, movement_graph).flatten() for f in self.features]
+
+        return np.concatenate(vecs)
+
+
+fc = FeatureCollector(
+    AgentPosition(),
+    BombDropPossible(),
+    ExplosionDirections(),
+    CoinDirections(),
+    OpponentDirections(),
+    Walls(),
+    CrateDirection(),
+    BombDirection(),
     MoveToNearestCoin(),
     MoveOutOfBlastZone(),
     MoveNextToNearestBox(),
@@ -694,4 +719,4 @@ features = [
     PossibleActions(),
     MoveIntoDeath(),
     CouldEscapeOwnBomb(),
-]
+)

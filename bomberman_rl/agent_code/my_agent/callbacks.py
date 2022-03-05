@@ -1,9 +1,29 @@
 import numpy as np
 from .learning_utilities import features_from_game_state
+from .features.feature import (
+    AgentInBlastZone,
+    AgentPosition,
+    BombDirection,
+    BombDropPossible,
+    BoxesInBlastRange,
+    CoinDirections,
+    CouldEscapeOwnBomb,
+    CrateDirection,
+    ExplosionDirections,
+    FeatureCollector,
+    MoveIntoDeath,
+    MoveNextToNearestBox,
+    MoveOutOfBlastZone,
+    MoveToNearestCoin,
+    OpponentDirections,
+    PossibleActions,
+    Walls,
+)
 from enum import Enum
 from joblib import dump, load
 import os
 import math
+
 
 EPSILON = 0
 MODEL_PATH = "model.joblib"
@@ -25,7 +45,6 @@ def setup(self):
 
 
 def act(self, game_state: dict):
-    print(game_state)
     if game_state["step"] == 1:
         choice = np.random.choice(["RIGHT", "LEFT", "UP", "DOWN"])  # DO NOT PLACE BOMB IMMEDIATELY
         return choice
@@ -38,19 +57,34 @@ def act(self, game_state: dict):
 
 def explore():
     choice = np.random.choice(["RIGHT", "LEFT", "UP", "DOWN", "WAIT", "BOMB"])
-    # print("action selected", choice)
-
     return choice
 
 
 def exploit(self, game_state):
-    feature_extration = FeatureExtraction(game_state)
+    feature_collector = fc = FeatureCollector(
+        AgentPosition(),
+        BombDropPossible(),
+        ExplosionDirections(),
+        CoinDirections(),
+        OpponentDirections(),
+        Walls(),
+        CrateDirection(),
+        BombDirection(),
+        MoveToNearestCoin(),
+        MoveOutOfBlastZone(),
+        MoveNextToNearestBox(),
+        BoxesInBlastRange(),
+        AgentInBlastZone(),
+        PossibleActions(),
+        # MoveIntoDeath(),
+        CouldEscapeOwnBomb(),
+    )
 
     best_prediction = "WAIT"
     best_prediction_value = -math.inf
     for action in Actions:
         action = action.name
-        features = np.array(features_from_game_state(self, feature_extration))
+        features = feature_collector.collect(game_state)
         prediction = self.trees[action].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction

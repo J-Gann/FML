@@ -4,6 +4,8 @@ import os
 from joblib import dump, load
 from sklearn.ensemble import RandomForestRegressor
 
+from .features.actions import Actions
+
 DISCOUNT = 0.95
 LEARNING_RATE = 0.01
 EPSILON = 1
@@ -114,9 +116,6 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
     self.n_states_new.append(new_features)
     self.n_actions.append(self_action)
     self.n_rewards.append(rewards)
-    # print("############################")
-    # print("rewards", self.n_rewards)
-    # print("actions", self.n_actions)
 
     if len(self.n_states_old) == N_STEP + 1:
         state_old = self.n_states_old.pop(0)  # get first state in the list
@@ -125,7 +124,6 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
         q_value_update = reward
         for i in range(N_STEP):
-            # print("add reward", self.n_rewards[i])
             q_value_update += DISCOUNT ** (i + 1) * self.n_rewards[i]
 
         state_new = self.n_states_new[-1]
@@ -160,17 +158,12 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
 
     while len(self.n_states_old) > 0:
 
-        # print("############################")
-        # print("rewards", self.n_rewards)
-        # print("actions", self.n_actions)
-
         state_old = self.n_states_old.pop(0)  # get first state in the list
         action = self.n_actions.pop(0)  # get first action in the list
         reward = self.n_rewards.pop(0)  # get first reward in the list
 
         q_value_update = reward
         for i in range(len(self.n_rewards)):
-            # print("add reward", self.n_rewards[i])
             q_value_update += DISCOUNT ** (i + 1) * self.n_rewards[i]
 
         if len(self.n_states_new) > 0:
@@ -178,7 +171,6 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
             q_value_update += DISCOUNT ** (N_STEP + 1) * np.max(
                 [self.trees[action_tree].predict(state_new.reshape(1, -1)) for action_tree in self.trees]
             )
-            # print("q_value", q_value)
 
             current_guess = self.trees[action].predict(state_old.reshape(1, -1))
 
@@ -216,8 +208,6 @@ def _train_q_model(action_value_data):
         values = np.ravel(np.array(values))
         # X_train, X_test, y_train, y_test = train_test_split(features, values, test_size=0.33)
         new_tree.fit(features, values)
-        # print("Tree score test",action, new_tree.score(X_test, y_test))
-        # print("Tree score train",action, new_tree.score(X_train, y_train))
 
         new_trees[action] = new_tree
     return new_trees
@@ -263,15 +253,6 @@ def _rewards_from_events(self, feature_extraction, events, action):
     blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()
     action_to_death = feature_extraction.FEATURE_move_into_death()
     bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()
-
-    # print("Action possible", feature_extraction._action_possible(action))
-    # print("action_to_coin", action_to_coin)
-    # print("action_to_box", action_to_box)
-    # print("in_blast", in_blast[0])
-    # print("bomb_good", bomb_good[0])
-    # print("blast_boxes", blast_boxes[0])
-    # print("action_to_safety", action_to_safety)
-    # print("action_to_death", action_to_death)
 
     # GENERAL MOVEMENT
     general_movement_reward = 0
@@ -341,13 +322,6 @@ def _rewards_from_events(self, feature_extraction, events, action):
     else:
         coins_reward -= 1  # Did not move towards safety when necessary
     # coins_reward = max(0, coins_reward) # Do not penalize below -1
-
-    # print("movement reward", general_movement_reward)
-    # print("bomb reward", bomb_reward)
-    # print("safety reward", safety_reward)
-    # print("boxes reward", boxes_reward)
-    # print("coins reward", coins_reward)
-    # print("######")
 
     movement_importance = 1
     bomb_importance = 1.2

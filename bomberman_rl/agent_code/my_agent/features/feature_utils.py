@@ -77,7 +77,7 @@ def action_new_index(agent_position, action):
         return agent_position
 
 
-def agent_position(game_state: dict) -> np.array:
+def get_agent_position(game_state: dict) -> np.array:
     return game_state["self"][-1]
 
 
