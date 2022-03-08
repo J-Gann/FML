@@ -1,6 +1,7 @@
 import enum
 import json
 import logging
+from os import mkdir
 import pickle
 import subprocess
 from collections import defaultdict, namedtuple
@@ -20,6 +21,8 @@ from fallbacks import pygame
 from items import Coin, Explosion, Bomb
 
 import pandas as pd
+
+DATA_DIR = "./data"
 
 WorldArgs = namedtuple(
     "WorldArgs",
@@ -593,7 +596,18 @@ class BombeRLeWorld(GenericWorld):
 
     def end(self):
         super().end()
-        self.history.to_pickle(f"{DATA_DIR}/epoch_{epoch}.pkl")
+
+        current_batch_file = f"{DATA_DIR}/current_batch.txt"
+
+        batch = None
+        try:
+            batch = int(open(current_batch_file).read())
+        except:
+            mkdir(DATA_DIR)
+            batch = 1
+
+        self.history.to_pickle(f"{DATA_DIR}/batch_{batch:04}.pkl")
+        open(current_batch_file, "w").write(str(batch + 1))
 
         self.logger.info("SHUT DOWN")
         for a in self.agents:
