@@ -1,8 +1,9 @@
+import enum
 import json
 import logging
 import pickle
 import subprocess
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime
 from pathlib import Path
 from threading import Event
@@ -10,12 +11,15 @@ from time import time
 from typing import List, Tuple, Dict
 
 import numpy as np
+from pyparsing import col
 
 import events as e
 import settings as s
 from agents import Agent, SequentialAgentBackend
 from fallbacks import pygame
 from items import Coin, Explosion, Bomb
+
+import pandas as pd
 
 WorldArgs = namedtuple(
     "WorldArgs",
@@ -39,12 +43,8 @@ WorldArgs = namedtuple(
 
 
 class Trophy:
-    coin_trophy = pygame.transform.smoothscale(
-        pygame.image.load(s.ASSET_DIR / "coin.png"), (15, 15)
-    )
-    suicide_trophy = pygame.transform.smoothscale(
-        pygame.image.load(s.ASSET_DIR / "explosion_0.png"), (15, 15)
-    )
+    coin_trophy = pygame.transform.smoothscale(pygame.image.load(s.ASSET_DIR / "coin.png"), (15, 15))
+    suicide_trophy = pygame.transform.smoothscale(pygame.image.load(s.ASSET_DIR / "explosion_0.png"), (15, 15))
     time_trophy = pygame.image.load(s.ASSET_DIR / "hourglass.png")
 
 
@@ -83,9 +83,7 @@ class GenericWorld:
         self.logger.setLevel(s.LOG_GAME)
         handler = logging.FileHandler(f"{self.args.log_dir}/game.log", mode="w")
         handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.info("Initializing game world")
@@ -215,9 +213,7 @@ class GenericWorld:
                 for a in self.active_agents:
                     if a.x == coin.x and a.y == coin.y:
                         coin.collectable = False
-                        self.logger.info(
-                            f"Agent <{a.name}> picked up coin at {(a.x, a.y)} and receives 1 point"
-                        )
+                        self.logger.info(f"Agent <{a.name}> picked up coin at {(a.x, a.y)} and receives 1 point")
                         a.update_score(s.REWARD_COIN)
                         a.add_event(e.COIN_COLLECTED)
                         a.trophies.append(Trophy.coin_trophy)
@@ -245,9 +241,7 @@ class GenericWorld:
         for bomb in self.bombs:
             if bomb.timer <= 0:
                 # Explode when timer is finished
-                self.logger.info(
-                    f"Agent <{bomb.owner.name}>'s bomb at {(bomb.x, bomb.y)} explodes"
-                )
+                self.logger.info(f"Agent <{bomb.owner.name}>'s bomb at {(bomb.x, bomb.y)} explodes")
                 bomb.owner.add_event(e.BOMB_EXPLODED)
                 blast_coords = bomb.get_blast_coords(self.arena)
 
@@ -271,11 +265,7 @@ class GenericWorld:
                     )
                     for (x, y) in blast_coords
                 ]
-                self.explosions.append(
-                    Explosion(
-                        blast_coords, screen_coords, bomb.owner, s.EXPLOSION_TIMER
-                    )
-                )
+                self.explosions.append(Explosion(blast_coords, screen_coords, bomb.owner, s.EXPLOSION_TIMER))
                 bomb.active = False
             else:
                 # Progress countdown
@@ -297,17 +287,11 @@ class GenericWorld:
                             a.add_event(e.KILLED_SELF)
                             explosion.owner.trophies.append(Trophy.suicide_trophy)
                         else:
-                            self.logger.info(
-                                f"Agent <{a.name}> blown up by agent <{explosion.owner.name}>'s bomb"
-                            )
-                            self.logger.info(
-                                f"Agent <{explosion.owner.name}> receives 1 point"
-                            )
+                            self.logger.info(f"Agent <{a.name}> blown up by agent <{explosion.owner.name}>'s bomb")
+                            self.logger.info(f"Agent <{explosion.owner.name}> receives 1 point")
                             explosion.owner.update_score(s.REWARD_KILL)
                             explosion.owner.add_event(e.KILLED_OPPONENT)
-                            explosion.owner.trophies.append(
-                                pygame.transform.smoothscale(a.avatar, (15, 15))
-                            )
+                            explosion.owner.trophies.append(pygame.transform.smoothscale(a.avatar, (15, 15)))
 
         # Remove hit agents
         for a in agents_hit:
@@ -329,10 +313,7 @@ class GenericWorld:
             a.note_stat("rounds")
         self.round_statistics[self.round_id] = {
             "steps": self.step,
-            **{
-                key: sum(a.statistics[key] for a in self.agents)
-                for key in ["coins", "kills", "suicides"]
-            },
+            **{key: sum(a.statistics[key] for a in self.agents) for key in ["coins", "kills", "suicides"]},
         }
 
     def time_to_stop(self):
@@ -350,10 +331,7 @@ class GenericWorld:
             self.logger.info(f"One agent left alive with nothing to do, wrap up round")
             return True
 
-        if (
-            any(a.train for a in self.agents)
-            and not self.args.continue_without_training
-        ):
+        if any(a.train for a in self.agents) and not self.args.continue_without_training:
             if not any([a.train for a in self.active_agents]):
                 self.logger.info("No training agent left alive, wrap up round")
                 return True
@@ -379,9 +357,7 @@ class GenericWorld:
             elif self.args.match_name is not None:
                 file_name = f"results/{self.args.match_name}.json"
             else:
-                file_name = (
-                    f'results/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}.json'
-                )
+                file_name = f'results/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}.json'
 
             name = Path(file_name)
             if not name.parent.exists():
@@ -395,17 +371,30 @@ class BombeRLeWorld(GenericWorld):
         super().__init__(args)
 
         self.setup_agents(agents)
+        self.history = pd.DataFrame(
+            columns=[
+                "round",
+                "step",
+                "field",
+                "bombs",
+                "coins",
+                "agent_1_state",
+                "agent_1_action",
+                "agent_2_state",
+                "agent_2_action",
+                "agent_3_state",
+                "agent_3_action",
+                "agent_4_state",
+                "agent_4_action",
+            ]
+        )
 
     def setup_agents(self, agents):
         # Add specified agents and start their subprocesses
         self.agents = []
         for agent_dir, train in agents:
             if list([d for d, t in agents]).count(agent_dir) > 1:
-                name = (
-                    agent_dir
-                    + "_"
-                    + str(list([a.code_name for a in self.agents]).count(agent_dir))
-                )
+                name = agent_dir + "_" + str(list([a.code_name for a in self.agents]).count(agent_dir))
             else:
                 name = agent_dir
             self.add_agent(agent_dir, name, train=train)
@@ -419,9 +408,7 @@ class BombeRLeWorld(GenericWorld):
         scenario_info = s.SCENARIOS[self.args.scenario]
 
         # Crates in random locations
-        arena[
-            self.rng.random((s.COLS, s.ROWS)) < scenario_info["CRATE_DENSITY"]
-        ] = CRATE
+        arena[self.rng.random((s.COLS, s.ROWS)) < scenario_info["CRATE_DENSITY"]] = CRATE
 
         # Walls
         arena[:1, :] = WALL
@@ -447,26 +434,38 @@ class BombeRLeWorld(GenericWorld):
 
         # Place coins at random, at preference under crates
         coins = []
-        all_positions = np.stack(
-            np.meshgrid(np.arange(s.COLS), np.arange(s.ROWS), indexing="ij"), -1
-        )
+        all_positions = np.stack(np.meshgrid(np.arange(s.COLS), np.arange(s.ROWS), indexing="ij"), -1)
         crate_positions = self.rng.permutation(all_positions[arena == CRATE])
         free_positions = self.rng.permutation(all_positions[arena == FREE])
-        coin_positions = np.concatenate([crate_positions, free_positions], 0)[
-            : scenario_info["COIN_COUNT"]
-        ]
+        coin_positions = np.concatenate([crate_positions, free_positions], 0)[: scenario_info["COIN_COUNT"]]
         for x, y in coin_positions:
             coins.append(Coin((x, y), collectable=arena[x, y] == FREE))
 
         # Reset agents and distribute starting positions
         active_agents = []
-        for agent, start_position in zip(
-            self.agents, self.rng.permutation(start_positions)
-        ):
+        for agent, start_position in zip(self.agents, self.rng.permutation(start_positions)):
             active_agents.append(agent)
             agent.x, agent.y = start_position
 
         return arena, coins, active_agents
+
+    def get_state(self):
+        state = {
+            "round": self.round,
+            "step": self.step,
+            "field": np.array(self.arena),
+            "bombs": [bomb.get_state() for bomb in self.bombs],
+            "coins": [coin.get_state() for coin in self.coins if coin.collectable],
+        }
+
+        explosion_map = np.zeros(self.arena.shape)
+        for exp in self.explosions:
+            if exp.is_dangerous():
+                for (x, y) in exp.blast_coords:
+                    explosion_map[x, y] = max(explosion_map[x, y], exp.timer - 1)
+        state["explosion_map"] = explosion_map
+
+        return state, [agent.get_state() for agent in self.agents]
 
     def get_state_for_agent(self, agent: Agent):
         if agent.dead:
@@ -477,9 +476,7 @@ class BombeRLeWorld(GenericWorld):
             "step": self.step,
             "field": np.array(self.arena),
             "self": agent.get_state(),
-            "others": [
-                other.get_state() for other in self.active_agents if other is not agent
-            ],
+            "others": [other.get_state() for other in self.active_agents if other is not agent],
             "bombs": [bomb.get_state() for bomb in self.bombs],
             "coins": [coin.get_state() for coin in self.coins if coin.collectable],
             "user_input": self.user_input,
@@ -496,9 +493,15 @@ class BombeRLeWorld(GenericWorld):
 
     def poll_and_run_agents(self):
         # Tell agents to act
-        for a in self.active_agents:
+        state, agent_state = self.get_state()
+
+        for i, a in enumerate(self.active_agents):
             if a.available_think_time > 0:
+                state["self"] = agent_state[i]
+                state["others"] = agent_state[:i] + agent_state[i + 1 :]
                 a.act(self.get_state_for_agent(a))
+
+        performed_actions = defaultdict(lambda: "WAIT")
 
         # Give agents time to decide
         perm = self.rng.permutation(len(self.active_agents))
@@ -518,13 +521,9 @@ class BombeRLeWorld(GenericWorld):
                     action = "ERROR"
                     think_time = float("inf")
 
-                self.logger.info(
-                    f"Agent <{a.name}> chose action {action} in {think_time:.2f}s."
-                )
+                self.logger.info(f"Agent <{a.name}> chose action {action} in {think_time:.2f}s.")
                 if think_time > a.available_think_time:
-                    next_think_time = a.base_timeout - (
-                        think_time - a.available_think_time
-                    )
+                    next_think_time = a.base_timeout - (think_time - a.available_think_time)
                     self.logger.warning(
                         f'Agent <{a.name}> exceeded think time by {think_time - a.available_think_time:.2f}s. Setting action to "WAIT" and decreasing available time for next round to {next_think_time:.2f}s.'
                     )
@@ -532,19 +531,23 @@ class BombeRLeWorld(GenericWorld):
                     a.trophies.append(Trophy.time_trophy)
                     a.available_think_time = next_think_time
                 else:
-                    self.logger.info(
-                        f"Agent <{a.name}> stayed within acceptable think time."
-                    )
+                    self.logger.info(f"Agent <{a.name}> stayed within acceptable think time.")
                     a.available_think_time = a.base_timeout
             else:
-                self.logger.info(
-                    f"Skipping agent <{a.name}> because of last slow think time."
-                )
+                self.logger.info(f"Skipping agent <{a.name}> because of last slow think time.")
                 a.available_think_time += a.base_timeout
                 action = "WAIT"
 
             self.replay["actions"][a.name].append(action)
+            performed_actions[a] = action
             self.perform_agent_action(a, action)
+
+        state.pop("self")
+        state.pop("others")
+        for i in range(4):
+            state[f"agent_{i}_state"] = agent_state[i]
+            state[f"agent_{i}_action"] = performed_actions[self.agents[i]]
+        self.history = self.history.append(state, ignore_index=True)
 
     def send_game_events(self):
         # Send events to all agents that expect them, then reset and wait for them
@@ -584,16 +587,14 @@ class BombeRLeWorld(GenericWorld):
         # Save course of the game for future replay
         if self.args.save_replay:
             self.replay["n_steps"] = self.step
-            name = (
-                f"replays/{self.round_id}.pt"
-                if self.args.save_replay is True
-                else self.args.save_replay
-            )
+            name = f"replays/{self.round_id}.pt" if self.args.save_replay is True else self.args.save_replay
             with open(name, "wb") as f:
                 pickle.dump(self.replay, f)
 
     def end(self):
         super().end()
+        self.history.to_pickle(f"{DATA_DIR}/epoch_{epoch}.pkl")
+
         self.logger.info("SHUT DOWN")
         for a in self.agents:
             # Send exit message to shut down agent
@@ -630,9 +631,7 @@ class GUI:
 
         self.frame = 0
 
-    def render_text(
-        self, text, x, y, color, halign="left", valign="top", size="medium", aa=False
-    ):
+    def render_text(self, text, x, y, color, halign="left", valign="top", size="medium", aa=False):
         text_surface = self.fonts[size].render(text, aa, color)
         text_rect = text_surface.get_rect()
         if halign == "left":
@@ -720,11 +719,7 @@ class GUI:
         leading = max(agents, key=lambda a: (a.score, a.name))
         y_base = s.GRID_OFFSET[1] + 15
         for i, a in enumerate(agents):
-            bounce = (
-                0
-                if (a is not leading or self.world.running)
-                else np.abs(10 * np.sin(5 * time()))
-            )
+            bounce = 0 if (a is not leading or self.world.running) else np.abs(10 * np.sin(5 * time()))
             a.render(self.screen, 600, y_base + 50 * i - 15 - bounce)
             self.render_text(
                 a.display_name,
@@ -757,11 +752,7 @@ class GUI:
 
         # End of round info
         if not self.world.running:
-            x_center = (
-                (s.WIDTH - s.GRID_OFFSET[0] - s.COLS * s.GRID_SIZE) / 2
-                + s.GRID_OFFSET[0]
-                + s.COLS * s.GRID_SIZE
-            )
+            x_center = (s.WIDTH - s.GRID_OFFSET[0] - s.COLS * s.GRID_SIZE) / 2 + s.GRID_OFFSET[0] + s.COLS * s.GRID_SIZE
             color = np.int_(
                 (
                     255 * (np.sin(3 * time()) / 3 + 0.66),
@@ -787,9 +778,7 @@ class GUI:
                 halign="center",
                 size="big",
             )
-            leading_total = max(
-                self.world.agents, key=lambda a: (a.total_score, a.display_name)
-            )
+            leading_total = max(self.world.agents, key=lambda a: (a.total_score, a.display_name))
             if leading_total is leading:
                 self.render_text(
                     f"{leading_total.display_name} is also in the lead.",
@@ -815,9 +804,7 @@ class GUI:
             self.world.logger.debug(f"Saving screenshot for frame {self.frame}")
             pygame.image.save(
                 self.screen,
-                str(
-                    self.screenshot_dir / f"{self.world.round_id}_{self.frame:05d}.png"
-                ),
+                str(self.screenshot_dir / f"{self.world.round_id}_{self.frame:05d}.png"),
             )
 
     def make_video(self):

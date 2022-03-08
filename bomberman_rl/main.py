@@ -1,6 +1,7 @@
 import os
 from argparse import ArgumentParser
 from pathlib import Path
+from sys import argv
 from time import sleep, time
 from tqdm import tqdm
 
@@ -29,9 +30,7 @@ class Timekeeper:
             sleep(duration)
 
 
-def world_controller(
-    world, n_rounds, /, gui, every_step, turn_based, make_video, update_interval
-):
+def world_controller(world, n_rounds, /, gui, every_step, turn_based, make_video, update_interval):
     if make_video and not gui.screenshot_dir.exists():
         gui.screenshot_dir.mkdir()
 
@@ -96,6 +95,8 @@ def world_controller(
 
 
 def main(argv=None):
+    argv = argv[1:]
+
     parser = ArgumentParser()
 
     subparsers = parser.add_subparsers(dest="command_name", required=True)
@@ -122,9 +123,7 @@ def main(argv=None):
         choices=[0, 1, 2, 3, 4],
         help="First … agents should be set to training mode",
     )
-    play_parser.add_argument(
-        "--continue-without-training", default=False, action="store_true"
-    )
+    play_parser.add_argument("--continue-without-training", default=False, action="store_true")
     # play_parser.add_argument("--single-process", default=False, action="store_true")
 
     play_parser.add_argument("--scenario", default="classic", choices=s.SCENARIOS)
@@ -135,9 +134,7 @@ def main(argv=None):
         help="Reset the world's random number generator to a known number for reproducibility",
     )
 
-    play_parser.add_argument(
-        "--n-rounds", type=int, default=10, help="How many rounds to play"
-    )
+    play_parser.add_argument("--n-rounds", type=int, default=10, help="How many rounds to play")
     play_parser.add_argument(
         "--save-replay",
         const=True,
@@ -187,9 +184,7 @@ def main(argv=None):
             default=0.1,
             help="How often agents take steps (ignored without GUI)",
         )
-        sub.add_argument(
-            "--log-dir", default=os.path.dirname(os.path.abspath(__file__)) + "/logs"
-        )
+        sub.add_argument("--log-dir", default=os.path.dirname(os.path.abspath(__file__)) + "/logs")
         sub.add_argument(
             "--save-stats",
             const=True,
@@ -256,4 +251,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    main(argv)
