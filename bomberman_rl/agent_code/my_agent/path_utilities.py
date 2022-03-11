@@ -241,7 +241,6 @@ class FeatureExtraction():
         res = []
         for action in Actions:
             if action == Actions.NONE: pass
-            elif action == Actions.WAIT: res.append(1)
             elif action == Actions.BOMB: res.append(int(self.game_state["self"][2]))
             else: 
                 new_index = self._action_new_index(action)
@@ -253,7 +252,6 @@ class FeatureExtraction():
 
     def _action_possible(self, action):
         if action == Actions.NONE: pass
-        elif action == Actions.WAIT: return True
         elif action == Actions.BOMB: return self.game_state["self"][2]
         else: 
             new_index = self._action_new_index(action)

@@ -252,7 +252,8 @@ def _rewards_from_events(self, feature_extraction, events, action, score_diff):
         if action == action_to_box: rewards += 1
         else: rewards -= 1
     else:
-        rewards -= 1 # Do something
-
+        #rewards -= 1 # Do something
+        pass
+    
     print(rewards)
     return rewards + 10 * score_diff
