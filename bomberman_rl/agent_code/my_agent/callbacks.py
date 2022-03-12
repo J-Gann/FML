@@ -18,25 +18,23 @@ class Actions(Enum):
     BOMB = 5
 
 def setup(self):
+    self.past_moves = []
     if os.path.isfile(MODEL_PATH): self.trees = load(MODEL_PATH)
     self.EPSILON = EPSILON
 
 def act(self, game_state: dict):
-    #if game_state["step"] == 1:
-    #    choice = np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN']) # DO NOT PLACE BOMB IMMEDIATELY
-    #    return choice
-    # Exploit or explore according to the exploration probability
-    if np.random.randint(1,100) / 100 < self.EPSILON: return explore()
+    if game_state["round"] == 1: self.past_moves = []
+    if np.random.randint(1,100) / 100 < self.EPSILON: return explore(self)
     else: return exploit(self, game_state)
 
-def explore():
+def explore(self):
     choice = np.random.choice(['RIGHT', 'LEFT', 'UP', 'DOWN', 'WAIT', 'BOMB'])
     #print("RANDOM action selected", choice)
-
+    self.past_moves.append(choice)
     return choice
 
 def exploit(self, game_state):
-    feature_extration = FeatureExtraction(game_state)
+    feature_extration = FeatureExtraction(game_state, self.past_moves)
 
     best_prediction = "WAIT"
     best_prediction_value = -math.inf
@@ -51,5 +49,6 @@ def exploit(self, game_state):
 
     #print("##############")
     #print("action selected", best_prediction)
+    self.past_moves.append(best_prediction)
     return best_prediction
 

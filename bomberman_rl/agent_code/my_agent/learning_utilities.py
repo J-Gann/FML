@@ -10,40 +10,12 @@ from sklearn.linear_model import LinearRegression
 import copy
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.1
 EPSILON = 1
 EPSILON_MIN = 0.05
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 N_STEP = 6
-
-feature_names = ["move_to__nearest_coin_up",
-"move_to__nearest_coin_right",
-"move_to__nearest_coin_down",
-"move_to__nearest_coin_left",
-"move_to__nearest_coin_wait",
-"move_to__nearest_coin_bomb",
-"move_to_safety_up",
-"move_to_safety_right",
-"move_to_safety_down",
-"move_to_safety_left",
-"move_to_safety_wait",
-"move_to_safety_bomb",
-"move_to_nearest_box_up",
-"move_to_nearest_box_right",
-"move_to_nearest_box_down",
-"move_to_nearest_box_left",
-"move_to_nearest_box_wait",
-"move_to_nearest_box_bomb",
- "in_blast_zone", 
- "move_up_possible",
-"move_right_possible",
-"move_down_possible",
-"move_left_possible",
-"move_wait_possible",
-"move_bomb_possible",
- "boxes_in_range",
- "bomb_good"]
 
 def setup_learning_features(self, load_model=True):
     self.EPSILON = EPSILON
@@ -53,7 +25,6 @@ def setup_learning_features(self, load_model=True):
     self.n_actions = []
     self.n_rewards = []
 
-    self.past_moves = []
     self.last_bomb_position = []
 
     self.rewards_round = 0
@@ -64,23 +35,22 @@ def setup_learning_features(self, load_model=True):
     else:
         if load_model: print("[WARN] Unable to load model from filesystem. Reinitializing model!")
         self.trees = {
-            "UP": RandomForestRegressor(max_depth=4, bootstrap=False),
-            "DOWN": RandomForestRegressor(max_depth=4, bootstrap=False),
-            "LEFT": RandomForestRegressor(max_depth=4, bootstrap=False),
-            "RIGHT": RandomForestRegressor(max_depth=4, bootstrap=False),
-            "WAIT": RandomForestRegressor(max_depth=4, bootstrap=False),
-            "BOMB": RandomForestRegressor(max_depth=4, bootstrap=False)
+            "UP": RandomForestRegressor(max_depth=5, bootstrap=False),
+            "DOWN": RandomForestRegressor(max_depth=5, bootstrap=False),
+            "LEFT": RandomForestRegressor(max_depth=5, bootstrap=False),
+            "RIGHT": RandomForestRegressor(max_depth=5, bootstrap=False),
+            "WAIT": RandomForestRegressor(max_depth=5, bootstrap=False),
+            "BOMB": RandomForestRegressor(max_depth=5, bootstrap=False)
             }
-        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(27)).reshape(1, -1) , [0])
+        for action_tree in self.trees: self.trees[action_tree].fit(np.array(np.zeros(38)).reshape(1, -1) , [0])
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
-    self.past_moves.append(self_action)
     if Actions[self_action] == Actions.BOMB: self.last_bomb_position.append(old_game_state["self"][3])
 
     score_diff = new_game_state["self"][1] - old_game_state["self"][1]
 
-    feature_extration_old = FeatureExtraction(old_game_state)
-    feature_extration_new = FeatureExtraction(new_game_state)
+    feature_extration_old = FeatureExtraction(old_game_state, self.past_moves)
+    feature_extration_new = FeatureExtraction(new_game_state, self.past_moves)
 
     old_features = np.array(features_from_game_state(self, feature_extration_old))
     new_features = np.array(features_from_game_state(self, feature_extration_new))
@@ -123,14 +93,12 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
 def update_action_value_last_step(self, last_game_state, last_action, events):
     print("Score:", last_game_state["self"][1])
-    self.past_moves.append(last_action)
     if Actions[last_action] == Actions.BOMB: self.last_bomb_position.append(last_game_state["self"][3])
-    feature_extration_old = FeatureExtraction(last_game_state)
+    feature_extration_old = FeatureExtraction(last_game_state, self.past_moves)
     old_features = np.array(features_from_game_state(self, feature_extration_old))
     rewards = _rewards_from_events(self, feature_extration_old, events, last_action, 0)
     self.rewards_round += rewards
     self.rewards_round = 0
-    self.past_moves = []
     self.last_bomb_position = []
 
     q_value_old = self.trees[last_action].predict(old_features.reshape(1, -1))
@@ -188,7 +156,7 @@ def _train_q_model(self, action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = RandomForestRegressor(max_depth=4, bootstrap=False)
+        new_tree = RandomForestRegressor(max_depth=5, bootstrap=False)
         features = np.array(features)
         values = np.ravel(np.array(values))
         X_train, X_test, y_train, y_test = train_test_split(features, values, test_size=0.33)
@@ -220,6 +188,12 @@ def features_from_game_state(self, feature_extraction):
     features += blast_boxes
     bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()
     features += bomb_good
+    move = feature_extraction.FEATURE_move_next_to_nearest_enemy().as_one_hot()
+    features += move
+    moves = feature_extraction.FEATURE_past_moves()
+    features += moves
+    blast_enemies = feature_extraction.FEATURE_enemies_in_agent_blast_range()
+    features += blast_enemies
     return np.array(features)
 
 def _rewards_from_events(self, feature_extraction, events, action, score_diff):
@@ -229,9 +203,11 @@ def _rewards_from_events(self, feature_extraction, events, action, score_diff):
     action_to_coin = feature_extraction.FEATURE_move_to_nearest_coin()
     action_to_safety = feature_extraction.FEATURE_move_out_of_blast_zone()
     action_to_box = feature_extraction.FEATURE_move_next_to_nearest_box()
+    action_to_enemy = feature_extraction.FEATURE_move_next_to_nearest_enemy()
     in_blast = feature_extraction.FEATURE_in_blast_zone()[0]
     blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()[0]
     bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()[0]
+    blast_enemies = feature_extraction.FEATURE_enemies_in_agent_blast_range()[0]
 
     can_place_bomb = feature_extraction._action_possible(Actions.BOMB)
 
@@ -245,15 +221,20 @@ def _rewards_from_events(self, feature_extraction, events, action, score_diff):
     elif action_to_coin != Actions.NONE:
         if action == action_to_coin: rewards += 1
         else: rewards -= 1
-    elif can_place_bomb and bomb_good and blast_boxes > 0:
+    elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB: rewards += 1
         else: rewards -= 1
     elif action_to_box != Actions.NONE:
         if action == action_to_box: rewards += 1
         else: rewards -= 1
+    elif action_to_enemy != Actions.NONE:
+        if action == action_to_coin: rewards += 1
+        else: rewards -= 1
     else:
         #rewards -= 1 # Do something
         pass
     
+    
+
     print(rewards)
     return rewards + 10 * score_diff

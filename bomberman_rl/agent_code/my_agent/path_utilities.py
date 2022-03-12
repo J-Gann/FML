@@ -21,7 +21,7 @@ class Actions(Enum):
 
 
 class FeatureExtraction():
-    def __init__(self, game_state):
+    def __init__(self, game_state, past_moves):
         self.game_state = game_state
         self.field = self.game_state["field"]
         self.explosion_map = self.game_state["explosion_map"]
@@ -31,7 +31,9 @@ class FeatureExtraction():
         self.bombs = game_state["bombs"]
         self.bomb_indices = [(bomb[0][0], bomb[0][1]) for bomb in self.bombs]
         self.movement_graph = self._create_movement_graph()
-
+        self.enemies = game_state["others"]
+        self.enemy_indices = [(enemy[3][0], enemy[3][1]) for enemy in self.enemies]
+        self.past_moves = [Actions[move].value for move in past_moves]
 
     def _create_movement_graph(self):    
         row = []
@@ -51,7 +53,7 @@ class FeatureExtraction():
         return csr_matrix((data, (row, col)))
 
     def _index_obstructed(self, index):
-        # Check if the field is obstructed at the index by wither a wall, a boy, an explosion or an out of range error
+        # Check if the field is obstructed at the index by either a wall, a box, an explosion or an out of range error
         x, y = index
         in_range = 0 <= x < s.COLS and 0 <= y < s.ROWS 
         is_wall = self.field[x, y] == -1
@@ -268,50 +270,42 @@ class FeatureExtraction():
         #print("bomb_good", res)
         return [res]
 
-'''
-def print_field(field):
-    print(" ", end="")
-    for x in range(s.COLS):
-        print(" ___ ", end="")
-    print("")
-    # Notice: x and y loops are reversed, to transpose the matrix and present the field as seen on the gui
-    for y in range(s.COLS):
-        print("|",end="")
-        for x in range(s.ROWS):
-            if field[x,y] == -1: print(" XXX ",end="")
-            else: 
-                node = _index_to_node((x,y))
-                numb = ""
-                if node < 10: numb = "00" + str(node)
-                elif node < 100: numb = "0" + str(node)
-                elif node >= 100: numb = "" + str(node)
-                print(" " + numb + " ",end="")
-        print("|")
-    print(" ", end="")
-    for x in range(s.COLS):
-        print(" ___ ", end="")
-    print("")
+    def FEATURE_move_next_to_nearest_enemy(self):
+        enemy_neighbors = []
+        tuple_indices = [(index[0], index[1]) for index in self.enemy_indices]
+        # find all neighbors of enemyes the agent can move to (the enemy itsel is always out of range for the agent)
+        for x, y in tuple_indices:
+            neighbors = [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]
+            for nx, ny in neighbors:
+                if not self._index_obstructed((nx,ny)):
+                    enemy_neighbors.append((nx, ny))
+        if self.agent_index in enemy_neighbors:
+            #print("move_to_nearest_enemy", Actions.WAIT)
+            return Actions.WAIT
+        step = self._next_step_to_nearest_index(enemy_neighbors)
+        #print("move_to_nearest_enemy", step)
+        #print(step)
+        return step
 
+    def FEATURE_enemies_in_agent_blast_range(self):
+        sum = 0
+        x, y = self.agent_index
+        for i in range(4):
+            if self.field[x+i, y] == -1: break
+            if 0 < x+i < s.COLS and (x+i, y) in self. enemy_indices: sum+= 1
+        for i in range(4):
+            if self.field[x-i, y] == -1: break
+            if s.COLS > x-i > 0 and (x-i, y) in self. enemy_indices: sum+= 1
+        for i in range(4):
+            if self.field[x, y+i] == -1: break
+            if 0 < y+i < s.ROWS and (x, y+i) in self. enemy_indices: sum+= 1
+        for i in range(4):
+            if self.field[x, y-i] == -1: break
+            if s.ROWS > y-i > 0 and (x, y-i) in self. enemy_indices: sum+= 1
+        #print("boxes_in_blast",sum)
+        return [sum]
 
-def box_in_the_way(game_state):
-    agent = game_state["self"][3]
-    agent_x = agent[0]
-    agent_y = agent[1]
-
-    neighbor_up = (agent_x, agent_y+1)
-    neighbor_down = (agent_x, agent_y-1)
-    neighbor_left = (agent_x+1, agent_y)
-    neighbor_right = (agent_x-1, agent_y)
-
-    up_box = game_state["field"][neighbor_up[0]][neighbor_up[1]] == 1
-    down_box = game_state["field"][neighbor_down[0]][neighbor_down[1]] == 1
-    left_box = game_state["field"][neighbor_left[0]][neighbor_left[1]] == 1
-    right_box = game_state["field"][neighbor_right[0]][neighbor_right[1]] == 1
-    return [int(up_box), int(right_box), int(down_box), int(left_box)]
-    
-
-def blast_in_the_way():
-    # for each movement (left, right, up, down) return a number if it would place the agent
-    # on a blast zone. the number is the steps until the blast
-    pass
-'''
+    def FEATURE_past_moves(self, n=4):
+        if len(self.past_moves) < n: return [-1 for i in range(n)]
+        moves = self.past_moves[-n:]
+        return moves
