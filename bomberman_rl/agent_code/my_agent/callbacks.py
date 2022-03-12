@@ -23,7 +23,7 @@ def setup(self):
     self.EPSILON = EPSILON
 
 def act(self, game_state: dict):
-    if game_state["round"] == 1: self.past_moves = []
+    if game_state["step"] == 1: self.past_moves = []
     if np.random.randint(1,100) / 100 < self.EPSILON: return explore(self)
     else: return exploit(self, game_state)
 
