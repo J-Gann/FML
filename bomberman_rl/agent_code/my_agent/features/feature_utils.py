@@ -82,6 +82,10 @@ def get_agent_position(game_state: dict) -> np.array:
     return game_state["self"][-1]
 
 
+def get_enemy_positions(game_state: dict) -> np.array:
+    return [(enemy[3][0], enemy[3][1]) for enemy in game_state["others"]]
+
+
 def camel_to_snake_case(s):
     return re.sub("(?!^)([A-Z]+)", r"_\1", s).lower()
 

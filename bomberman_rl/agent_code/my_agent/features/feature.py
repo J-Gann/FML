@@ -21,6 +21,7 @@ from .feature_utils import (
     crate_positions,
     format_boolean,
     format_position,
+    get_enemy_positions,
     k_closest,
     manhattan_distance,
     pad_matrix,
@@ -251,7 +252,7 @@ class MoveNextToNearestBox(ActionFeature):
 
 class MoveToNearestEnemy(ActionFeature):
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
-        enemy_indices = [(enemy[3][0], enemy[3][1]) for enemy in game_state["others"]]
+        enemy_indices = get_enemy_positions(game_state)
 
         enemy_neighbors = []
         tuple_indices = [(index[0], index[1]) for index in enemy_indices]
@@ -264,6 +265,48 @@ class MoveToNearestEnemy(ActionFeature):
         if get_agent_position(game_state) in enemy_neighbors:
             return Actions.WAIT
         return movement_graph.next_step_to_nearest_index(enemy_neighbors)
+
+
+class EnemiesInBlastRange(Feature):
+    def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
+        sum = 0
+        x, y = get_agent_position(game_state)
+        field = game_state["field"]
+        enemy_indices = get_enemy_positions(game_state)
+
+        for i in range(4):
+            if field[x + i, y] == -1:
+                break
+            if 0 < x + i < s.COLS and (x + i, y) in enemy_indices:
+                sum += 1
+        for i in range(4):
+            if field[x - i, y] == -1:
+                break
+            if s.COLS > x - i > 0 and (x - i, y) in enemy_indices:
+                sum += 1
+        for i in range(4):
+            if field[x, y + i] == -1:
+                break
+            if 0 < y + i < s.ROWS and (x, y + i) in enemy_indices:
+                sum += 1
+        for i in range(4):
+            if field[x, y - i] == -1:
+                break
+            if s.ROWS > y - i > 0 and (x, y - i) in enemy_indices:
+                sum += 1
+        # print("boxes_in_blast",sum)
+        return [sum]
+
+
+class PastMoves(Feature):
+    def __init__(self, n=4) -> None:
+        super().__init__()
+        self.n = n
+
+    def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
+        if len(self.past_moves) < self.n:
+            return [-1 for i in range(self.n)]
+        return self.past_moves[-self.n :]
 
 
 class BoxesInBlastRange(Feature):
