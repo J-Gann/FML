@@ -157,14 +157,26 @@ class MovementGraph:
     def blast_indices(self):
         blast_indices = []
         for x, y in self.bomb_indices:
+            blast_indices.append((x, y))
             for i in range(4):
-                if 0 < x + i < COLS:
+                if self.field[x + i, y] == -1:
+                    break
+                if 0 < x + i < s.COLS:
                     blast_indices.append((x + i, y))
-                if COLS > x - i > 0:
+            for i in range(4):
+                if self.field[x - i, y] == -1:
+                    break
+                if s.COLS > x - i > 0:
                     blast_indices.append((x - i, y))
-                if 0 < y + i < ROWS:
+            for i in range(4):
+                if self.field[x, y + i] == -1:
+                    break
+                if 0 < y + i < s.ROWS:
                     blast_indices.append((x, y + i))
-                if ROWS > y - i > 0:
+            for i in range(4):
+                if self.field[x, y - i] == -1:
+                    break
+                if s.ROWS > y - i > 0:
                     blast_indices.append((x, y - i))
         return blast_indices
 
