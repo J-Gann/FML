@@ -249,6 +249,23 @@ class MoveNextToNearestBox(ActionFeature):
         return np.array([movement_graph.next_step_to_nearest_index(box_neighbors).value])
 
 
+class MoveToNearestEnemy(ActionFeature):
+    def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
+        enemy_indices = [(enemy[3][0], enemy[3][1]) for enemy in game_state["others"]]
+
+        enemy_neighbors = []
+        tuple_indices = [(index[0], index[1]) for index in enemy_indices]
+        # find all neighbors of enemyes the agent can move to (the enemy itsel is always out of range for the agent)
+        for x, y in tuple_indices:
+            neighbors = [(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]
+            for nx, ny in neighbors:
+                if not movement_graph.index_obstructed((nx, ny)):
+                    enemy_neighbors.append((nx, ny))
+        if get_agent_position(game_state) in enemy_neighbors:
+            return Actions.WAIT
+        return movement_graph.next_step_to_nearest_index(enemy_neighbors)
+
+
 class BoxesInBlastRange(Feature):
     def dim(self) -> int:
         return 1
