@@ -87,14 +87,41 @@ class MovementGraph:
             return Actions.NONE
 
     def index_obstructed(self, index):
-        # Check if the field is obstructed at the index by wither a wall, a boy, an explosion or an out of range error
+        # Check if the field is obstructed at the index by either a wall, a box, an explosion or an out of range error
         x, y = index
-        in_range = 0 <= x < COLS and 0 <= y < ROWS
+        in_range = 0 <= x < s.COLS and 0 <= y < s.ROWS
         is_wall = self.field[x, y] == -1
         is_box = self.field[x, y] == 1
         is_explosion = self.explosion_map[x, y] != 0
         is_bomb = (x, y) in self.bomb_indices and self.agent_index != (x, y)
-        return is_wall or is_box or is_explosion or not in_range or is_bomb
+        is_explosion_in_next_step = False
+        for bomb in self.game_state["bombs"]:
+            (xb, yb) = bomb[0]
+            time_till_explosion = bomb[1]
+            blast_indices = [(xb, yb)]
+            for i in range(4):
+                if self.field[xb + i, yb] == -1:
+                    break
+                if 0 < xb + i < s.COLS:
+                    blast_indices.append((xb + i, yb))
+            for i in range(4):
+                if self.field[xb - i, yb] == -1:
+                    break
+                if s.COLS > xb - i > 0:
+                    blast_indices.append((xb - i, yb))
+            for i in range(4):
+                if self.field[xb, yb + i] == -1:
+                    break
+                if 0 < yb + i < s.ROWS:
+                    blast_indices.append((xb, yb + i))
+            for i in range(4):
+                if self.field[xb, yb - i] == -1:
+                    break
+                if s.ROWS > yb - i > 0:
+                    blast_indices.append((xb, yb - i))
+            if (x, y) in blast_indices and time_till_explosion == 0:
+                is_explosion_in_next_step = True
+        return is_wall or is_box or is_explosion or not in_range or is_bomb or is_explosion_in_next_step
 
     def _node_in_movement_range(self, node):
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
