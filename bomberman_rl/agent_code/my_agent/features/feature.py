@@ -245,7 +245,7 @@ class MoveNextToNearestBox(ActionFeature):
                 if not movement_graph.index_obstructed((nx, ny)):
                     box_neighbors.append((nx, ny))
         if get_agent_position(game_state) in box_neighbors:
-            return np.array([Actions.NONE.value])
+            return np.array([Actions.WAIT.value])
         return np.array([movement_graph.next_step_to_nearest_index(box_neighbors).value])
 
 
