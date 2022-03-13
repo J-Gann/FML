@@ -259,13 +259,24 @@ class BoxesInBlastRange(Feature):
         field = game_state["field"]
 
         for i in range(4):
-            if 0 < x + i < COLS and field[x + i, y] == 1:
+            if field[x + i, y] == -1:
+                break
+            if 0 < x + i < s.COLS and field[x + i, y] == 1:
                 sum += 1
-            if COLS > x - i > 0 and field[x - i, y] == 1:
+        for i in range(4):
+            if field[x - i, y] == -1:
+                break
+            if s.COLS > x - i > 0 and field[x - i, y] == 1:
                 sum += 1
-            if 0 < y + i < ROWS and field[x, y + i] == 1:
+        for i in range(4):
+            if field[x, y + i] == -1:
+                break
+            if 0 < y + i < s.ROWS and field[x, y + i] == 1:
                 sum += 1
-            if ROWS > y - i > 0 and field[x, y - i] == 1:
+        for i in range(4):
+            if field[x, y - i] == -1:
+                break
+            if s.ROWS > y - i > 0 and field[x, y - i] == 1:
                 sum += 1
         return np.array([sum])
 
