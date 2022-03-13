@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from argparse import Action
 from typing import List, Tuple
 
 import math
@@ -349,16 +350,14 @@ class AgentInBlastZone(BooleanFeature):
 
 class PossibleActions(Feature):
     def dim(self) -> int:
-        return len(Actions) - 1
+        return len(Actions) - 2  # since we do not consider WAIT or NONE
 
     def compute_feature(self, game_state: dict, movement_graph: MovementGraph) -> np.array:
         agent_position = get_agent_position(game_state)
         res = []
         for action in Actions:
-            if action == Actions.NONE:
+            if action in [Actions.NONE, Actions.WAIT]:
                 pass
-            elif action == Actions.WAIT:
-                res.append(1)
             elif action == Actions.BOMB:
                 res.append(int(game_state["self"][2]))
             else:

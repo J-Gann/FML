@@ -72,9 +72,7 @@ def action_new_index(agent_position, action):
         return (x - 1, y)
     elif action == Actions.RIGHT:
         return (x + 1, y)
-    elif action == Actions.WAIT:
-        return agent_position
-    elif action == Actions.BOMB:
+    else:
         return agent_position
 
 
