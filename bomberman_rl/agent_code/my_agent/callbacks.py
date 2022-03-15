@@ -46,7 +46,7 @@ def explore(self):
 
 def exploit(self, game_state):
 
-    best_prediction = Actions.WAIT
+    best_prediction = "WAIT"
     best_prediction_value = -math.inf
 
     features = self.feature_collector.compute_feature(game_state, self)
@@ -59,5 +59,5 @@ def exploit(self, game_state):
             best_prediction_value = prediction
             best_prediction = action
 
-    self.past_moves.append(best_prediction.value)
+    self.past_moves.append(Actions[best_prediction])
     return best_prediction
