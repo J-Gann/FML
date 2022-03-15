@@ -440,8 +440,6 @@ class FeatureCollector(Feature):
 
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         self_obj.movement_graph = MovementGraph(game_state)
-        for f in self.features:
-            print(f.name(), f.dim(), f.compute_feature(game_state, self_obj))
 
         vecs = [f.compute_feature(game_state, self_obj).flatten() for f in self.features]
 
@@ -462,7 +460,24 @@ class FeatureCollector(Feature):
         print()
         print("{:*^30}".format(" feature summary "))
         print()
+        print(feature_vector)
+        print()
         print(self.explain_feature(feature_vector))
         print()
         print("{:*^30}".format(" end of feature summary "))
         print()
+
+    @classmethod
+    def create_current_version(cls):
+        return FeatureCollector(
+            MoveToNearestCoin(),
+            MoveOutOfBlastZone(),
+            MoveNextToNearestBox(),
+            AgentInBlastZone(),
+            PossibleActions(),
+            BoxesInBlastRange(),
+            CouldEscapeOwnBomb(),
+            MoveToNearestEnemy(),
+            PastMoves(),
+            EnemiesInBlastRange(),
+        )

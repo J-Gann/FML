@@ -1,3 +1,4 @@
+from argparse import Action
 import numpy as np
 
 from agent_code.my_agent.features.feature import (
@@ -37,18 +38,7 @@ class Actions(Enum):
 
 def setup(self):
     self.past_moves = []
-    self.feature_collector = FeatureCollector(
-        MoveToNearestCoin(),
-        MoveOutOfBlastZone(),
-        MoveNextToNearestBox(),
-        AgentInBlastZone(),
-        PossibleActions(),
-        BoxesInBlastRange(),
-        CouldEscapeOwnBomb(),
-        MoveToNearestEnemy(),
-        PastMoves(),
-        EnemiesInBlastRange(),
-    )
+    self.feature_collector = FeatureCollector.create_current_version()
 
     if os.path.isfile(MODEL_PATH):
         self.trees = load(MODEL_PATH)
@@ -65,23 +55,25 @@ def act(self, game_state: dict):
 
 
 def explore(self):
-    choice = np.random.choice(["RIGHT", "LEFT", "UP", "DOWN", "WAIT", "BOMB"])
+    choice = np.random.choice(list(Actions)[:-1])  # choose an action from all but NONE
     self.past_moves.append(choice)
     return choice
 
 
 def exploit(self, game_state):
 
-    best_prediction = "WAIT"
+    best_prediction = Actions.WAIT
     best_prediction_value = -math.inf
+
+    features = self.feature_collector.compute_feature(game_state, self)
+    self.feature_collector.print_feature_summary(features)
+
     for action in Actions:
-        action = action.name
-        features = self.feature_collector.compute_feature(game_state, self)
-        self.feature_collector.print_feature_summary(features)
-        prediction = self.trees[action].predict(features.reshape(1, -1))
+
+        prediction = self.trees[action.name].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction
             best_prediction = action
 
-    self.past_moves.append(best_prediction)
+    self.past_moves.append(best_prediction.value)
     return best_prediction

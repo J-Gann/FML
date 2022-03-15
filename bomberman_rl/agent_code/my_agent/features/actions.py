@@ -21,7 +21,6 @@ class Actions(Enum):
     @classmethod
     def from_one_hot(cls, one_hot_vec: np.array):
         if len(one_hot_vec) == len(Actions) - 1:
-            print(one_hot_vec)
             one_hot_vec = np.concatenate((one_hot_vec, np.array([0])), axis=0)
 
         if not np.any(one_hot_vec == 1):
