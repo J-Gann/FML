@@ -1,4 +1,19 @@
 import numpy as np
+
+from agent_code.my_agent.features.feature import (
+    AgentInBlastZone,
+    BoxesInBlastRange,
+    CouldEscapeOwnBomb,
+    EnemiesInBlastRange,
+    FeatureCollector,
+    MoveNextToNearestBox,
+    MoveOutOfBlastZone,
+    MoveToNearestCoin,
+    MoveToNearestEnemy,
+    PastMoves,
+    PossibleActions,
+)
+from agent_code.my_agent.features.movement_graph import MovementGraph
 from .learning_utilities import features_from_game_state
 from enum import Enum
 from joblib import dump, load
@@ -22,6 +37,19 @@ class Actions(Enum):
 
 def setup(self):
     self.past_moves = []
+    self.feature_collector = FeatureCollector(
+        MoveToNearestCoin(),
+        MoveOutOfBlastZone(),
+        MoveNextToNearestBox(),
+        MoveToNearestEnemy(),
+        EnemiesInBlastRange(),
+        PastMoves(),
+        BoxesInBlastRange(),
+        AgentInBlastZone(),
+        PossibleActions(),
+        CouldEscapeOwnBomb(),
+    )
+
     if os.path.isfile(MODEL_PATH):
         self.trees = load(MODEL_PATH)
     self.EPSILON = EPSILON
@@ -43,13 +71,12 @@ def explore(self):
 
 
 def exploit(self, game_state):
-    feature_extration = FeatureExtraction(game_state, self.past_moves)
 
     best_prediction = "WAIT"
     best_prediction_value = -math.inf
     for action in Actions:
         action = action.name
-        features = np.array(features_from_game_state(self, feature_extration))
+        features = self.feature_collector.compute_feature(game_state, MovementGraph(game_state))
         prediction = self.trees[action].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction
