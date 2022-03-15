@@ -50,7 +50,7 @@ def exploit(self, game_state):
     best_prediction_value = -math.inf
 
     features = self.feature_collector.compute_feature(game_state, self)
-    self.feature_collector.print_feature_summary(features)
+    #self.feature_collector.print_feature_summary(features)
 
     for action in Actions:
         action = action.name

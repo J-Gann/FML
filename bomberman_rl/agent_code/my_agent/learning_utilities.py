@@ -29,6 +29,7 @@ EPSILON = 1
 EPSILON_MIN = 0.05
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
+ACTION_VALUE_DATA_PATH = "action_values.joblib"
 N_STEP = 6
 
 
@@ -46,8 +47,9 @@ def setup_learning_features(self, load_model=True):
     self.q_updates = 0
     self.q_updates_sum = 0
 
-    if load_model and os.path.isfile(MODEL_PATH):
+    if load_model and os.path.isfile(MODEL_PATH) and os.path.isfile(ACTION_VALUE_DATA_PATH):
         self.trees = load(MODEL_PATH)
+        self.action_value_data = load(ACTION_VALUE_DATA_PATH)
     else:
         if load_model:
             print("[WARN] Unable to load model from filesystem. Reinitializing model!")
@@ -114,6 +116,7 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
         self.trees = _train_q_model(self, self.action_value_data)
         if save_model:
             dump(self.trees, MODEL_PATH)
+            dump(self.action_value_data, ACTION_VALUE_DATA_PATH)
 
 
 def _train_q_model(self, action_value_data):
