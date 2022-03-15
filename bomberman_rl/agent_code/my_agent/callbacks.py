@@ -48,7 +48,6 @@ def setup(self):
         MoveToNearestEnemy(),
         PastMoves(),
         EnemiesInBlastRange(),
-        BombDropPossible(),
     )
 
     if os.path.isfile(MODEL_PATH):

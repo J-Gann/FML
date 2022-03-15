@@ -350,13 +350,13 @@ class AgentInBlastZone(BooleanFeature):
 
 class PossibleActions(Feature):
     def dim(self) -> int:
-        return len(Actions) - 2  # since we do not consider WAIT or NONE
+        return len(Actions) - 1  # since we do not consider WAIT or NONE
 
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         agent_position = get_agent_position(game_state)
         res = []
         for action in Actions:
-            if action in [Actions.NONE, Actions.WAIT]:
+            if action in [Actions.NONE]:
                 pass
             elif action == Actions.BOMB:
                 res.append(int(game_state["self"][2]))
