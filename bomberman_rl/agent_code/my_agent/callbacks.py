@@ -1,24 +1,8 @@
-from argparse import Action
 import numpy as np
 
-from agent_code.my_agent.features.feature import (
-    AgentInBlastZone,
-    BombDropPossible,
-    BoxesInBlastRange,
-    CouldEscapeOwnBomb,
-    EnemiesInBlastRange,
-    FeatureCollector,
-    MoveNextToNearestBox,
-    MoveOutOfBlastZone,
-    MoveToNearestCoin,
-    MoveToNearestEnemy,
-    PastMoves,
-    PossibleActions,
-)
-from agent_code.my_agent.features.movement_graph import MovementGraph
-from .learning_utilities import features_from_game_state
+from agent_code.my_agent.features.feature import FeatureCollector, MoveNextToNearestBox, MoveToNearestCoin
 from enum import Enum
-from joblib import dump, load
+from joblib import load
 import os
 import math
 

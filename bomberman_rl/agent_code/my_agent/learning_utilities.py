@@ -1,3 +1,4 @@
+from argparse import Action
 from agent_code.my_agent.features.feature import (
     AgentInBlastZone,
     BoxesInBlastRange,
@@ -11,6 +12,8 @@ from agent_code.my_agent.features.feature import (
     PastMoves,
     PossibleActions,
 )
+from .features.actions import Actions
+
 from agent_code.my_agent.features.movement_graph import MovementGraph
 import events as e
 import numpy as np
@@ -19,7 +22,6 @@ from joblib import dump, load
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-import copy
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
@@ -44,19 +46,6 @@ def setup_learning_features(self, load_model=True):
     self.q_updates = 0
     self.q_updates_sum = 0
 
-    self.feature_collector = FeatureCollector(
-        MoveToNearestCoin(),
-        MoveOutOfBlastZone(),
-        MoveNextToNearestBox(),
-        MoveToNearestEnemy(),
-        EnemiesInBlastRange(),
-        PastMoves(),
-        BoxesInBlastRange(),
-        AgentInBlastZone(),
-        PossibleActions(),
-        CouldEscapeOwnBomb(),
-    )
-
     if load_model and os.path.isfile(MODEL_PATH):
         self.trees = load(MODEL_PATH)
     else:
@@ -75,22 +64,22 @@ def setup_learning_features(self, load_model=True):
 
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
-    if Actions[self_action] == Actions.BOMB:
+    if self_action == Actions.BOMB:
         self.last_bomb_position.append(old_game_state["self"][3])
 
     score_diff = new_game_state["self"][1] - old_game_state["self"][1]
 
-    old_features = self.feature_collector.compute_feature(self, old_game_state, MovementGraph(old_game_state))
-    new_features = self.feature_collector.compute_feature(self, new_game_state, MovementGraph(new_game_state))
+    old_features = self.feature_collector.compute_feature(old_game_state, self)
+    new_features = self.feature_collector.compute_feature(new_game_state, self)
 
-    rewards = _rewards_from_events(self, feature_extration_old, events, self_action, score_diff)
+    rewards = _rewards_from_events(self, old_features, events, self_action, score_diff)
 
-    q_value_old = self.trees[self_action].predict(old_features.reshape(1, -1))
+    q_value_old = self.trees[self_action.name].predict(old_features.reshape(1, -1))
     q_value_new = rewards + DISCOUNT * np.max(
         [self.trees[action_tree].predict(new_features.reshape(1, -1)) for action_tree in self.trees]
     )
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[self_action][tuple(old_features)] = q_value_old + q_value_update
+    self.action_value_data[self_action.name][tuple(old_features)] = q_value_old + q_value_update
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
@@ -98,19 +87,20 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
 def update_action_value_last_step(self, last_game_state, last_action, events):
     print("Score:", last_game_state["self"][1])
-    if Actions[last_action] == Actions.BOMB:
+    if last_action == Actions.BOMB:
         self.last_bomb_position.append(last_game_state["self"][3])
-    feature_extration_old = FeatureExtraction(last_game_state, self.past_moves)
-    old_features = np.array(features_from_game_state(self, feature_extration_old))
-    rewards = _rewards_from_events(self, feature_extration_old, events, last_action, 0)
+
+    old_features = self.feature_collector.compute_feature(last_game_state, self)
+    rewards = _rewards_from_events(self, old_features, events, last_action, 0)
+
     self.rewards_round += rewards
     self.rewards_round = 0
     self.last_bomb_position = []
 
-    q_value_old = self.trees[last_action].predict(old_features.reshape(1, -1))
+    q_value_old = self.trees[last_action.name].predict(old_features.reshape(1, -1))
     q_value_new = rewards + 0
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[last_action][tuple(old_features)] = q_value_old + q_value_update
+    self.action_value_data[last_action.name][tuple(old_features)] = q_value_old + q_value_update
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
@@ -157,45 +147,29 @@ def _train_q_model(self, action_value_data):
     return new_trees
 
 
-def features_from_game_state(self, feature_extraction):
-    features = []
-    move = feature_extraction.FEATURE_move_to_nearest_coin().as_one_hot()
-    features += move
-    move = feature_extraction.FEATURE_move_out_of_blast_zone().as_one_hot()
-    features += move
-    move = feature_extraction.FEATURE_move_next_to_nearest_box().as_one_hot()
-    features += move
-    in_blast = feature_extraction.FEATURE_in_blast_zone()
-    features += in_blast
-    move = feature_extraction.FEATURE_actions_possible()
-    features += move
-    blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()
-    features += blast_boxes
-    bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()
-    features += bomb_good
-    move = feature_extraction.FEATURE_move_next_to_nearest_enemy().as_one_hot()
-    features += move
-    moves = feature_extraction.FEATURE_past_moves()
-    features += moves
-    blast_enemies = feature_extraction.FEATURE_enemies_in_agent_blast_range()
-    features += blast_enemies
-    return np.array(features)
-
-
-def _rewards_from_events(self, feature_extraction, events, action, score_diff):
-    action = Actions[action]
+def _rewards_from_events(self, feature_vector, events, action, score_diff):
     rewards = 0
 
-    action_to_coin = feature_extraction.FEATURE_move_to_nearest_coin()
-    action_to_safety = feature_extraction.FEATURE_move_out_of_blast_zone()
-    action_to_box = feature_extraction.FEATURE_move_next_to_nearest_box()
-    action_to_enemy = feature_extraction.FEATURE_move_next_to_nearest_enemy()
-    in_blast = feature_extraction.FEATURE_in_blast_zone()[0]
-    blast_boxes = feature_extraction.FEATURE_boxes_in_agent_blast_range()[0]
-    bomb_good = feature_extraction.FEATURE_could_escape_own_bomb()[0]
-    blast_enemies = feature_extraction.FEATURE_enemies_in_agent_blast_range()[0]
+    feature_collector: FeatureCollector = self.feature_collector
 
-    can_place_bomb = feature_extraction._action_possible(Actions.BOMB)
+    action_to_coin = feature_collector.single_feature_from_vector(feature_vector, MoveToNearestCoin)
+    action_to_coin = Actions.from_one_hot(action_to_coin)
+
+    action_to_safety = feature_collector.single_feature_from_vector(feature_vector, MoveOutOfBlastZone)
+    action_to_safety = Actions.from_one_hot(action_to_safety)
+
+    action_to_box = feature_collector.single_feature_from_vector(feature_vector, MoveNextToNearestBox)
+    action_to_box = Actions.from_one_hot(action_to_box)
+
+    action_to_enemy = feature_collector.single_feature_from_vector(feature_vector, MoveToNearestEnemy)
+    action_to_enemy = Actions.from_one_hot(action_to_enemy)
+
+    blast_boxes = feature_collector.single_feature_from_vector(feature_vector, BoxesInBlastRange)[0]
+    bomb_good = feature_collector.single_feature_from_vector(feature_vector, CouldEscapeOwnBomb)[0]
+    blast_enemies = feature_collector.single_feature_from_vector(feature_vector, EnemiesInBlastRange)[0]
+
+    possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
+    can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:

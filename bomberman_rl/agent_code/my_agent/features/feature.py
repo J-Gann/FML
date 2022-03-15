@@ -1,4 +1,6 @@
 from abc import ABCMeta, abstractmethod
+from cmath import isinf
+from multiprocessing.sharedctypes import Value
 from typing import List
 import numpy as np
 import copy
@@ -307,7 +309,7 @@ class PastMoves(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         if len(self_obj.past_moves) < self.n:
             return np.array([-1 for i in range(self.n)])
-        return np.array(self_obj.past_moves[-self.n :])
+        return np.array([action.value for action in self_obj.past_moves[-self.n :]])
 
 
 class BoxesInBlastRange(Feature):
@@ -455,6 +457,16 @@ class FeatureCollector(Feature):
             index += f.dim()
 
         return "\n".join(explainations)
+
+    def single_feature_from_vector(self, feature_vector, feature_class):
+        index = 0
+
+        for f in self.features:
+            if isinstance(f, feature_class):
+                return feature_vector[index : index + f.dim()]
+            index += f.dim()
+
+        raise ValueError(f"no entry in feature collector for {feature_class}")
 
     def print_feature_summary(self, feature_vector):
         print()
