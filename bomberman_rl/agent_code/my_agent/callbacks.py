@@ -2,6 +2,7 @@ import numpy as np
 
 from agent_code.my_agent.features.feature import (
     AgentInBlastZone,
+    BombDropPossible,
     BoxesInBlastRange,
     CouldEscapeOwnBomb,
     EnemiesInBlastRange,
@@ -37,6 +38,7 @@ class Actions(Enum):
 def setup(self):
     self.past_moves = []
     self.feature_collector = FeatureCollector(
+        BombDropPossible(),
         MoveToNearestCoin(),
         MoveOutOfBlastZone(),
         MoveNextToNearestBox(),

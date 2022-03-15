@@ -80,12 +80,10 @@ class BooleanFeature(Feature):
 
 class ActionFeature(Feature):
     def dim(self) -> int:
-        return 1
+        return len(Actions) - 1  # since we dont consider NONE
 
     def format_feature(self, feature_vector: np.array) -> str:
-        assert len(feature_vector.shape) == 1 and feature_vector.shape[0] == 1, "must be scalar"
-
-        return list(Actions)[int(feature_vector[0])].name
+        return Actions.from_one_hot(feature_vector).name
 
 
 class AgentPosition(TwoDimensionalFeature):
@@ -205,10 +203,10 @@ class BombDirection(TwoDimensionalFeature):
 
 class MoveToNearestCoin(ActionFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        return np.array([self_obj.movement_graph.next_step_to_nearest_index(game_state["coins"]).value])
+        return self_obj.movement_graph.next_step_to_nearest_index(game_state["coins"]).as_one_hot()
 
 
-def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph):
+def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph) -> Actions:
     agent_position = get_agent_position(game_state)
     free_indices = []
     blast_indices = movement_graph.blast_indices()
@@ -221,14 +219,14 @@ def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph):
             if not obstructed and not in_blast_zone:
                 free_indices.append(index)
     if agent_position in blast_indices:
-        return np.array([movement_graph.next_step_to_nearest_index(free_indices).value])
+        return movement_graph.next_step_to_nearest_index(free_indices)
     else:
-        return np.array([Actions.NONE.value])
+        return Actions.NONE
 
 
 class MoveOutOfBlastZone(ActionFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        return move_out_of_blast_zone(game_state, self_obj.movement_graph)
+        return move_out_of_blast_zone(game_state, self_obj.movement_graph).as_one_hot()
 
 
 class MoveNextToNearestBox(ActionFeature):
@@ -243,8 +241,8 @@ class MoveNextToNearestBox(ActionFeature):
                 if not self_obj.movement_graph.index_obstructed((nx, ny)):
                     box_neighbors.append((nx, ny))
         if get_agent_position(game_state) in box_neighbors:
-            return np.array([Actions.WAIT.value])
-        return np.array([self_obj.movement_graph.next_step_to_nearest_index(box_neighbors).value])
+            return Actions.WAIT.as_one_hot()
+        return self_obj.movement_graph.next_step_to_nearest_index(box_neighbors).as_one_hot()
 
 
 class MoveToNearestEnemy(ActionFeature):
@@ -443,7 +441,7 @@ class FeatureCollector(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         self_obj.movement_graph = MovementGraph(game_state)
         for f in self.features:
-            print(f.compute_feature(game_state, self_obj))
+            print(f.name(), f.dim(), f.compute_feature(game_state, self_obj))
 
         vecs = [f.compute_feature(game_state, self_obj).flatten() for f in self.features]
 
