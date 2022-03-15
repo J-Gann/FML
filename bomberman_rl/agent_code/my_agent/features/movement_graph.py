@@ -29,7 +29,7 @@ class MovementGraph:
         self.agent_index = game_state["self"][3]
         self.agent_node = to_node(self.agent_index)
         self.bombs = game_state["bombs"]
-
+        self.obstructed = {}
         row = []
         col = []
         data = []
@@ -40,7 +40,10 @@ class MovementGraph:
                     if self.is_within_field(nx, ny):
                         node = to_node((x, y))
                         neighbor = to_node((nx, ny))
-                        if not self.node_obstructed(node) and not self.node_obstructed(neighbor):
+                        node_obstructed = self._node_obstructed(node)
+                        self.obstructed[node] = node_obstructed
+                        neighbor_obstructed = self._node_obstructed(neighbor)
+                        if not node_obstructed and not neighbor_obstructed:
                             row.append(node)
                             col.append(neighbor)
                             data.append(1)
@@ -49,10 +52,10 @@ class MovementGraph:
     def is_within_field(self, x: int, y: int) -> bool:
         return 0 <= x < COLS and 0 <= y < ROWS
 
-    def node_obstructed(self, node):
+    def _node_obstructed(self, node):
         # Check if the field is obstructed at the node by wither a wall, a boy or an explosion
         x, y = to_index(node)
-        return self.index_obstructed((x, y))
+        return self._index_obstructed((x, y))
 
     def next_step_to_nearest_node(self, nodes):
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
@@ -89,6 +92,15 @@ class MovementGraph:
             return Actions.NONE
 
     def index_obstructed(self, index):
+        node = to_node(index)
+        if node in self.obstructed: return self.obstructed[node]
+        else: return True
+
+    def node_obstructed(self, node):
+        if node in self.obstructed: return self.obstructed[node]
+        else: return True
+
+    def _index_obstructed(self, index):
         # Check if the field is obstructed at the index by either a wall, a box, an explosion or an out of range error
         x, y = index
         in_range = 0 <= x < s.COLS and 0 <= y < s.ROWS

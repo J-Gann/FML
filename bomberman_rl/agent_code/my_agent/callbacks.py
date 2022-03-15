@@ -39,9 +39,9 @@ def act(self, game_state: dict):
 
 
 def explore(self):
-    choice = np.random.choice(list(Actions)[:-1])  # choose an action from all but NONE
+    choice = np.random.choice(list(Actions))
     self.past_moves.append(choice)
-    return choice
+    return choice.name
 
 
 def exploit(self, game_state):
@@ -53,8 +53,8 @@ def exploit(self, game_state):
     self.feature_collector.print_feature_summary(features)
 
     for action in Actions:
-
-        prediction = self.trees[action.name].predict(features.reshape(1, -1))
+        action = action.name
+        prediction = self.trees[action].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction
             best_prediction = action

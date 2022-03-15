@@ -59,8 +59,8 @@ def setup_learning_features(self, load_model=True):
             "WAIT": RandomForestRegressor(max_depth=5, bootstrap=False),
             "BOMB": RandomForestRegressor(max_depth=5, bootstrap=False),
         }
-        for action_tree in self.trees.items():
-            action_tree.fit(np.array(np.zeros(self.feature_collector.dim())).reshape(1, -1), [0])
+        for action_tree in self.trees:
+            self.trees[action_tree].fit(np.array(np.zeros(self.feature_collector.dim())).reshape(1, -1), [0])
 
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
@@ -74,12 +74,12 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
     rewards = _rewards_from_events(self, old_features, events, self_action, score_diff)
 
-    q_value_old = self.trees[self_action.name].predict(old_features.reshape(1, -1))
+    q_value_old = self.trees[self_action].predict(old_features.reshape(1, -1))
     q_value_new = rewards + DISCOUNT * np.max(
         [self.trees[action_tree].predict(new_features.reshape(1, -1)) for action_tree in self.trees]
     )
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[self_action.name][tuple(old_features)] = q_value_old + q_value_update
+    self.action_value_data[self_action][tuple(old_features)] = q_value_old + q_value_update
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
@@ -97,10 +97,10 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
     self.rewards_round = 0
     self.last_bomb_position = []
 
-    q_value_old = self.trees[last_action.name].predict(old_features.reshape(1, -1))
+    q_value_old = self.trees[last_action].predict(old_features.reshape(1, -1))
     q_value_new = rewards + 0
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[last_action.name][tuple(old_features)] = q_value_old + q_value_update
+    self.action_value_data[last_action][tuple(old_features)] = q_value_old + q_value_update
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
@@ -148,6 +148,7 @@ def _train_q_model(self, action_value_data):
 
 
 def _rewards_from_events(self, feature_vector, events, action, score_diff):
+    action = Actions[action]
     rewards = 0
 
     feature_collector: FeatureCollector = self.feature_collector
@@ -170,6 +171,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
+
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:
