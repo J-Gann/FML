@@ -38,17 +38,17 @@ class Actions(Enum):
 def setup(self):
     self.past_moves = []
     self.feature_collector = FeatureCollector(
-        BombDropPossible(),
         MoveToNearestCoin(),
         MoveOutOfBlastZone(),
         MoveNextToNearestBox(),
-        MoveToNearestEnemy(),
-        EnemiesInBlastRange(),
-        PastMoves(),
-        BoxesInBlastRange(),
         AgentInBlastZone(),
         PossibleActions(),
+        BoxesInBlastRange(),
         CouldEscapeOwnBomb(),
+        MoveToNearestEnemy(),
+        PastMoves(),
+        EnemiesInBlastRange(),
+        BombDropPossible(),
     )
 
     if os.path.isfile(MODEL_PATH):
