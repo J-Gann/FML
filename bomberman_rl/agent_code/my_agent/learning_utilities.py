@@ -12,7 +12,6 @@ from agent_code.my_agent.features.feature import (
     PossibleActions,
 )
 from agent_code.my_agent.features.movement_graph import MovementGraph
-from .path_utilities import FeatureExtraction, Actions
 import events as e
 import numpy as np
 import os

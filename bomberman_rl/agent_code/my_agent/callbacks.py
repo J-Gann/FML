@@ -19,7 +19,6 @@ from enum import Enum
 from joblib import dump, load
 import os
 import math
-from .path_utilities import FeatureExtraction, Actions
 
 # isn't this also set in learning utils?
 EPSILON = 0
@@ -76,7 +75,8 @@ def exploit(self, game_state):
     best_prediction_value = -math.inf
     for action in Actions:
         action = action.name
-        features = self.feature_collector.compute_feature(game_state, MovementGraph(game_state))
+        features = self.feature_collector.compute_feature(game_state, self)
+        self.feature_collector.print_feature_summary(features)
         prediction = self.trees[action].predict(features.reshape(1, -1))
         if best_prediction_value < prediction:
             best_prediction_value = prediction

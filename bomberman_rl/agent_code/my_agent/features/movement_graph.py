@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
 from .actions import Actions
+import settings as s
 
 COLS, ROWS = 17, 17
 
@@ -27,6 +28,7 @@ class MovementGraph:
         self.bomb_indices = bomb_indices(game_state)
         self.agent_index = game_state["self"][3]
         self.agent_node = to_node(self.agent_index)
+        self.bombs = game_state["bombs"]
 
         row = []
         col = []
@@ -95,7 +97,7 @@ class MovementGraph:
         is_explosion = self.explosion_map[x, y] != 0
         is_bomb = (x, y) in self.bomb_indices and self.agent_index != (x, y)
         is_explosion_in_next_step = False
-        for bomb in self.game_state["bombs"]:
+        for bomb in self.bombs:
             (xb, yb) = bomb[0]
             time_till_explosion = bomb[1]
             blast_indices = [(xb, yb)]

@@ -1,5 +1,7 @@
 from enum import Enum
 
+import numpy as np
+
 
 class Actions(Enum):
     UP = 0
@@ -14,4 +16,4 @@ class Actions(Enum):
         self.name
 
     def as_one_hot(self):
-        return [int(self.value == index) for index in range(6)]
+        return np.array([int(self.value == index) for index in range(6)])

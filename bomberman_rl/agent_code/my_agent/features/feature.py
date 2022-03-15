@@ -260,11 +260,14 @@ class MoveToNearestEnemy(ActionFeature):
                 if not self_obj.movement_graph.index_obstructed((nx, ny)):
                     enemy_neighbors.append((nx, ny))
         if get_agent_position(game_state) in enemy_neighbors:
-            return Actions.WAIT
-        return self_obj.movement_graph.next_step_to_nearest_index(enemy_neighbors)
+            return Actions.WAIT.as_one_hot()
+        return self_obj.movement_graph.next_step_to_nearest_index(enemy_neighbors).as_one_hot()
 
 
 class EnemiesInBlastRange(Feature):
+    def dim(self) -> int:
+        return 1
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         sum = 0
         x, y = get_agent_position(game_state)
@@ -292,7 +295,7 @@ class EnemiesInBlastRange(Feature):
             if s.ROWS > y - i > 0 and (x, y - i) in enemy_indices:
                 sum += 1
         # print("boxes_in_blast",sum)
-        return [sum]
+        return np.array([sum])
 
 
 class PastMoves(Feature):
@@ -300,10 +303,13 @@ class PastMoves(Feature):
         super().__init__()
         self.n = n
 
+    def dim(self) -> int:
+        return self.n
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        if len(self.past_moves) < self.n:
-            return [-1 for i in range(self.n)]
-        return self.past_moves[-self.n :]
+        if len(self_obj.past_moves) < self.n:
+            return np.array([-1 for i in range(self.n)])
+        return np.array(self_obj.past_moves[-self.n :])
 
 
 class BoxesInBlastRange(Feature):
@@ -436,7 +442,10 @@ class FeatureCollector(Feature):
 
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         self_obj.movement_graph = MovementGraph(game_state)
-        vecs = [f.compute_feature(game_state, self_obj.movement_graph).flatten() for f in self.features]
+        for f in self.features:
+            print(f.compute_feature(game_state, self_obj))
+
+        vecs = [f.compute_feature(game_state, self_obj).flatten() for f in self.features]
 
         return np.concatenate(vecs)
 
