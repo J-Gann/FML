@@ -53,8 +53,6 @@ class GenericWorld:
         self.round = 0
         self.round_statistics = {}
 
-        self.rng = np.random.default_rng(args.seed)
-
         self.running = False
 
     def setup_logging(self):
@@ -196,10 +194,10 @@ class GenericWorld:
             explosion.timer -= 1
             if explosion.timer <= 0:
                 explosion.next_stage()
+                if explosion.stage == 1:
+                    explosion.owner.bombs_left = True
             if explosion.stage is not None:
                 remaining_explosions.append(explosion)
-            else:
-                explosion.owner.bombs_left = True
         self.explosions = remaining_explosions
 
     def update_bombs(self):
@@ -334,6 +332,7 @@ class BombeRLeWorld(GenericWorld):
     def __init__(self, args: WorldArgs, agents):
         super().__init__(args)
 
+        self.rng = np.random.default_rng(args.seed)
         self.setup_agents(agents)
 
     def setup_agents(self, agents):
@@ -421,8 +420,11 @@ class BombeRLeWorld(GenericWorld):
     def poll_and_run_agents(self):
         # Tell agents to act
         for a in self.active_agents:
+            state = self.get_state_for_agent(a)
+            a.store_game_state(state)
+            a.reset_game_events()
             if a.available_think_time > 0:
-                a.act(self.get_state_for_agent(a))
+                a.act(state)
 
         # Give agents time to decide
         perm = self.rng.permutation(len(self.active_agents))
@@ -478,9 +480,6 @@ class BombeRLeWorld(GenericWorld):
                     if enemy is not a:
                         pass
                         # a.wait_for_enemy_game_event_processing()
-        for a in self.active_agents:
-            a.store_game_state(self.get_state_for_agent(a))
-            a.reset_game_events()
 
     def end_round(self):
         super().end_round()

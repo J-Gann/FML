@@ -1,5 +1,0 @@
-digraph Tree {
-node [shape=box, fontname="helvetica"] ;
-edge [fontname="helvetica"] ;
-0 [label="squared_error = 0.005\nsamples = 1742\nvalue = 5.818"] ;
-}
