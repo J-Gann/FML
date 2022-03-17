@@ -431,6 +431,83 @@ class CouldEscapeOwnBomb(BooleanFeature):
         return np.array([int(res)])
 
 
+class AgentFieldNeighbors(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        neighbors = []
+        x, y = get_agent_position(game_state)
+        for i in range(2):
+            if 0 < x + i < COLS:
+                neighbors.append(game_state["field"][x + i][y])
+            else:
+                neighbors.append(-2)
+            if COLS > x - i > 0:
+                neighbors.append(game_state["field"][x - i][y])
+            else:
+                neighbors.append(-2)
+            if 0 < y + i < ROWS:
+                neighbors.append(game_state["field"][x][y + i])
+            else:
+                neighbors.append(-2)
+            if ROWS > y - i > 0:
+                neighbors.append(game_state["field"][x][y - i])
+            else:
+                neighbors.append(-2)
+        return np.array(neighbors)
+
+    def dim(self) -> int:
+        return 8
+
+class AgentExplosionNeighbors(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        neighbors = []
+        x, y = get_agent_position(game_state)
+        for i in range(2):
+            if 0 < x + i < COLS:
+                neighbors.append(game_state["explosion_map"][x + i][y])
+            else:
+                neighbors.append(-1)
+            if COLS > x - i > 0:
+                neighbors.append(game_state["explosion_map"][x - i][y])
+            else:
+                neighbors.append(-1)
+            if 0 < y + i < ROWS:
+                neighbors.append(game_state["explosion_map"][x][y + i])
+            else:
+                neighbors.append(-1)
+            if ROWS > y - i > 0:
+                neighbors.append(game_state["explosion_map"][x][y - i])
+            else:
+                neighbors.append(-1)
+        return np.array(neighbors)
+
+    def dim(self) -> int:
+        return 8
+
+# If the enemy can move in only one or two directions and our agent can find a
+# path to the enemy, he should place a bomb next to him
+class NearestEnemyPossibleMoves(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        enemy_indices = get_enemy_positions(game_state)
+        nearest_index = self_obj.movement_graph.nearest_index(enemy_indices)
+        if nearest_index != None:
+            x, y = nearest_index
+            enemy_movement_range = 0
+            if self_obj.movement_graph.index_obstructed(x + 1, y): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed(x - 1, y): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed(x, y + 1): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed(x, y - 1): enemy_movement_range += 1
+            print("range", enemy_movement_range)
+            return np.array([enemy_movement_range])
+        else:
+            print("range", -1)
+            return np.array([-1])
+
+    def dim(self) -> int:
+        return 1
+
+
+
+
 class FeatureCollector(Feature):
     def __init__(self, *features: List[Feature]):
         self.features: List[Feature] = features
@@ -490,4 +567,7 @@ class FeatureCollector(Feature):
             MoveToNearestEnemy(),
             PastMoves(),
             EnemiesInBlastRange(),
+            AgentFieldNeighbors(),
+            AgentExplosionNeighbors(),
+            NearestEnemyPossibleMoves()
         )

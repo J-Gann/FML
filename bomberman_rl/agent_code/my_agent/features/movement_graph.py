@@ -57,6 +57,33 @@ class MovementGraph:
         x, y = to_index(node)
         return self._index_obstructed((x, y))
 
+
+    def nearest_index(self, indices):
+        nodes = [to_node(index) for index in indices]
+        nearest_node = self.nearest_node(nodes)
+        if nearest_node != None: return to_index(nearest_node)
+
+    def nearest_node(self, nodes):
+        # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
+        nodes = self.remove_obstructed_nodes(nodes)
+        nodes = self.remove_nodes_out_of_range(nodes)
+        if len(nodes) == 0:
+            return None
+        distances, predecessors, sources = dijkstra(
+            csgraph=self.matrix,
+            directed=True,
+            indices=nodes,
+            return_predecessors=True,
+            unweighted=True,
+            min_only=True,
+        )
+        if not self._node_in_movement_range(self.agent_node):
+            # Agent node is currently seperated from all other nodes and is therefore not contained in the movement_graph
+            return None
+        source = sources[self.agent_node]
+        if source != -9999: return source
+        else: return None
+
     def next_step_to_nearest_node(self, nodes):
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self.remove_obstructed_nodes(nodes)
