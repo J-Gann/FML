@@ -492,14 +492,12 @@ class NearestEnemyPossibleMoves(Feature):
         if nearest_index != None:
             x, y = nearest_index
             enemy_movement_range = 0
-            if self_obj.movement_graph.index_obstructed(x + 1, y): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed(x - 1, y): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed(x, y + 1): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed(x, y - 1): enemy_movement_range += 1
-            print("range", enemy_movement_range)
+            if self_obj.movement_graph.index_obstructed((x + 1, y)): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x - 1, y)): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x, y + 1)): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x, y - 1)): enemy_movement_range += 1
             return np.array([enemy_movement_range])
         else:
-            print("range", -1)
             return np.array([-1])
 
     def dim(self) -> int:
