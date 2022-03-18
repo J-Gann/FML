@@ -27,7 +27,7 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
-EPSILON = 0#1
+EPSILON = 1
 EPSILON_MIN = 0.05
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
@@ -56,12 +56,12 @@ def setup_learning_features(self, load_model=True):
         if load_model:
             print("[WARN] Unable to load model from filesystem. Reinitializing model!")
         self.trees = {
-            "UP": RandomForestRegressor(max_depth=15, bootstrap=False),
-            "DOWN": RandomForestRegressor(max_depth=15, bootstrap=False),
-            "LEFT": RandomForestRegressor(max_depth=15, bootstrap=False),
-            "RIGHT": RandomForestRegressor(max_depth=15, bootstrap=False),
-            "WAIT": RandomForestRegressor(max_depth=15, bootstrap=False),
-            "BOMB": RandomForestRegressor(max_depth=15, bootstrap=False),
+            "UP": RandomForestRegressor(max_depth=12, bootstrap=False),
+            "DOWN": RandomForestRegressor(max_depth=12, bootstrap=False),
+            "LEFT": RandomForestRegressor(max_depth=12, bootstrap=False),
+            "RIGHT": RandomForestRegressor(max_depth=12, bootstrap=False),
+            "WAIT": RandomForestRegressor(max_depth=12, bootstrap=False),
+            "BOMB": RandomForestRegressor(max_depth=12, bootstrap=False),
         }
         for action_tree in self.trees:
             self.trees[action_tree].fit(np.array(np.zeros(self.feature_collector.dim())).reshape(1, -1), [0])
@@ -135,7 +135,7 @@ def _train_q_model(self, action_value_data):
             value = action_value_data_action[key]
             features.append(feature)
             values.append(value)
-        new_tree = RandomForestRegressor(max_depth=15, bootstrap=False)
+        new_tree = RandomForestRegressor(max_depth=12, bootstrap=False)
         features = np.array(features)
         values = np.ravel(np.array(values))
         X_train, X_test, y_train, y_test = train_test_split(features, values, test_size=0.33)

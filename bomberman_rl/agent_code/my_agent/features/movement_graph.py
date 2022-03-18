@@ -12,6 +12,8 @@ COLS, ROWS = 17, 17
 def bomb_indices(game_state: dict) -> List[Tuple]:
     return [(bomb[0][0], bomb[0][1]) for bomb in game_state["bombs"]]
 
+def enemy_indices(game_state: dict) -> List[Tuple]:
+    return [(other[3][0], other[3][1]) for other in game_state["others"]]
 
 def to_node(index):
     return index[1] * COLS + index[0]
@@ -29,6 +31,8 @@ class MovementGraph:
         self.agent_index = game_state["self"][3]
         self.agent_node = to_node(self.agent_index)
         self.bombs = game_state["bombs"]
+        self.enemies = game_state["others"]
+        self.enemy_indices = enemy_indices(game_state)
         self.obstructed = {}
         row = []
         col = []
@@ -136,6 +140,7 @@ class MovementGraph:
         is_explosion = self.explosion_map[x, y] != 0
         is_bomb = (x, y) in self.bomb_indices and self.agent_index != (x, y)
         is_explosion_in_next_step = False
+        is_enemy = (x, y) in self.enemy_indices
         for bomb in self.bombs:
             (xb, yb) = bomb[0]
             time_till_explosion = bomb[1]
@@ -162,7 +167,7 @@ class MovementGraph:
                     blast_indices.append((xb, yb - i))
             if (x, y) in blast_indices and time_till_explosion == 0:
                 is_explosion_in_next_step = True
-        return is_wall or is_box or is_explosion or not in_range or is_bomb or is_explosion_in_next_step
+        return is_wall or is_box or is_explosion or not in_range or is_bomb or is_explosion_in_next_step or is_enemy
 
     def _node_in_movement_range(self, node):
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
