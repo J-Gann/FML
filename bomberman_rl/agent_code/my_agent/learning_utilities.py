@@ -199,7 +199,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
         else:
             rewards -= 1
     elif action_to_enemy != Actions.NONE:
-        if action == action_to_coin:
+        if action == action_to_enemy:
             rewards += 1
         else:
             rewards -= 1
