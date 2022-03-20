@@ -367,57 +367,6 @@ class PossibleActions(Feature):
         return np.array(res)
 
 
-class MoveIntoDeath(Feature):
-    def dim(self) -> int:
-        return len(Actions) - 1
-
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        res = []
-        for action in Actions:
-            if action == Actions.NONE:
-                pass
-            elif action == Actions.WAIT or action == Actions.BOMB:
-                agent_index_blast_next_step = False
-                for bomb in self.game_state["bombs"]:
-                    (x, y) = bomb[0]
-                    time_till_explosion = bomb[1]
-                    blast_indices = []
-                    for i in range(4):
-                        if 0 < x + i < COLS:
-                            blast_indices.append((x + i, y))
-                        if COLS > x - i > 0:
-                            blast_indices.append((x - i, y))
-                        if 0 < y + i < ROWS:
-                            blast_indices.append((x, y + i))
-                        if ROWS > y - i > 0:
-                            blast_indices.append((x, y - i))
-                    if self.agent_index in blast_indices and time_till_explosion == 0:
-                        agent_index_blast_next_step = True
-                res.append(int(agent_index_blast_next_step))
-            else:
-                # FIXME: this should not unpack action
-                (nx, ny) = action
-                next_node_in_active_blast = not self.explosion_map[nx][ny] == 0
-                next_node_in_active_blast_next_step = False
-                for bomb in self.game_state["bombs"]:
-                    (x, y) = bomb[0]
-                    time_till_explosion = bomb[1]
-                    blast_indices = []
-                    for i in range(4):
-                        if 0 < x + i < COLS:
-                            blast_indices.append((x + i, y))
-                        if COLS > x - i > 0:
-                            blast_indices.append((x - i, y))
-                        if 0 < y + i < ROWS:
-                            blast_indices.append((x, y + i))
-                        if ROWS > y - i > 0:
-                            blast_indices.append((x, y - i))
-                    if (nx, ny) in blast_indices and time_till_explosion == 0:
-                        next_node_in_active_blast_next_step = True
-                res.append(int(next_node_in_active_blast or next_node_in_active_blast_next_step))
-        return np.array(res)
-
-
 class CouldEscapeOwnBomb(BooleanFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         old_bomb_indices = copy.deepcopy(self_obj.movement_graph.bomb_indices)
@@ -503,8 +452,86 @@ class NearestEnemyPossibleMoves(Feature):
     def dim(self) -> int:
         return 1
 
+class CoinDistance(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        coin_indices = game_state["coins"]
+        nearest_index = self_obj.movement_graph.nearest_index(coin_indices)
+        if nearest_index == None: return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
+        if distance != None: return np.array([distance])
+        else: return np.array([-1])
 
+    def dim(self) -> int:
+        return 1
 
+class BoxDistance(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        box_neighbors = []
+        indices = np.argwhere(game_state["field"] == 1)
+        tuple_indices = [(index[0], index[1]) for index in indices]
+        # find all neighbors of boxes the agent can move to (the box itsel is always out of range for the agent)
+        for x, y in tuple_indices:
+            neighbors = [(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]
+            for nx, ny in neighbors:
+                if not self_obj.movement_graph.index_obstructed((nx, ny)):
+                    box_neighbors.append((nx, ny))
+        if get_agent_position(game_state) in box_neighbors:
+            return np.array([0])
+        nearest_index = self_obj.movement_graph.nearest_index(box_neighbors)
+        if nearest_index == None: return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
+        if distance != None: return np.array([distance])
+        else: return np.array([-1])
+
+    def dim(self) -> int:
+        return 1
+
+class EnemyDistance(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        enemy_indices = get_enemy_positions(game_state)
+        enemy_neighbors = []
+        tuple_indices = [(index[0], index[1]) for index in enemy_indices]
+        # find all neighbors of enemyes the agent can move to (the enemy itsel is always out of range for the agent)
+        for x, y in tuple_indices:
+            neighbors = [(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]
+            for nx, ny in neighbors:
+                if not self_obj.movement_graph.index_obstructed((nx, ny)):
+                    enemy_neighbors.append((nx, ny))
+        if get_agent_position(game_state) in enemy_neighbors:
+            return np.array([0])
+        nearest_index = self_obj.movement_graph.nearest_index(enemy_neighbors)
+        if nearest_index == None: return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
+        if distance != None: return np.array([distance])
+        else: return np.array([-1])
+
+    def dim(self) -> int:
+        return 1
+
+class SafetyDistance(Feature):
+    def compute_feature(self, game_state: dict, self_obj) -> np.array:
+        agent_position = get_agent_position(game_state)
+        free_indices = []
+        blast_indices = self_obj.movement_graph.blast_indices()
+
+        for x in range(COLS):
+            for y in range(ROWS):
+                index = (x, y)
+                obstructed = self_obj.movement_graph.index_obstructed(index)
+                in_blast_zone = index in blast_indices
+                if not obstructed and not in_blast_zone:
+                    free_indices.append(index)
+        if agent_position in blast_indices:
+            nearest_index = self_obj.movement_graph.nearest_index(free_indices)
+            if nearest_index == None: return np.array([-1])
+            distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
+            if distance != None: return np.array([distance])
+            else: return np.array([-1])
+        else:
+            return np.array([-1])
+
+    def dim(self) -> int:
+        return 1
 
 class FeatureCollector(Feature):
     def __init__(self, *features: List[Feature]):
@@ -567,5 +594,9 @@ class FeatureCollector(Feature):
             EnemiesInBlastRange(),
             AgentFieldNeighbors(),
             AgentExplosionNeighbors(),
-            NearestEnemyPossibleMoves()
+            NearestEnemyPossibleMoves(),
+            SafetyDistance(),
+            EnemyDistance(),
+            BoxDistance(),
+            CoinDistance()
         )

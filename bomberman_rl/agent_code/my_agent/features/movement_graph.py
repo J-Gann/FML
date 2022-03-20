@@ -15,6 +15,8 @@ def bomb_indices(game_state: dict) -> List[Tuple]:
 def enemy_indices(game_state: dict) -> List[Tuple]:
     return [(other[3][0], other[3][1]) for other in game_state["others"]]
 
+
+
 def to_node(index):
     return index[1] * COLS + index[0]
 
@@ -68,7 +70,6 @@ class MovementGraph:
         if nearest_node != None: return to_index(nearest_node)
 
     def nearest_node(self, nodes):
-        # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self.remove_obstructed_nodes(nodes)
         nodes = self.remove_nodes_out_of_range(nodes)
         if len(nodes) == 0:
@@ -87,6 +88,31 @@ class MovementGraph:
         source = sources[self.agent_node]
         if source != -9999: return source
         else: return None
+
+    def nearest_distance_index(self, index):
+        node = to_node(index)
+        return self.nearest_distance_node(node)
+
+    def nearest_distance_node(self, node):
+        if node == None:
+            return None
+        distances, predecessors, sources = dijkstra(
+            csgraph=self.matrix,
+            directed=True,
+            indices=node,
+            return_predecessors=True,
+            unweighted=True,
+            min_only=True,
+        )
+        if not self._node_in_movement_range(self.agent_node):
+            # Agent node is currently seperated from all other nodes and is therefore not contained in the movement_graph
+            return None
+        source = sources[self.agent_node]
+        if source != -9999:  # A path to one of the nodes exists
+            distance = distances[self.agent_node]
+            return distance
+        else:
+            return None
 
     def next_step_to_nearest_node(self, nodes):
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
