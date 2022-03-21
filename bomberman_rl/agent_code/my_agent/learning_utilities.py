@@ -25,7 +25,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
-DISCOUNT = 0.95
+DISCOUNT = 0.8
 LEARNING_RATE = 0.01
 EPSILON = 0#1
 EPSILON_MIN = 0#0.05
@@ -207,17 +207,19 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
             pass
     """
 
-    if e.CRATE_DESTROYED in events: rewards += 0.5
     if e.COIN_COLLECTED in events: rewards += 1
+    if e.CRATE_DESTROYED in events: rewards += 0.5
     if e.KILLED_OPPONENT in events: rewards += 5
-    if e.GOT_KILLED in events: rewards -= 5
+    if e.GOT_KILLED in events: rewards -= 6
     if e.INVALID_ACTION in events: rewards -= 0.1
     if e.COIN_FOUND in events: rewards += 0.5
-    if e.SURVIVED_ROUND in events: rewards += 10
 
-
+    # Getting killed gives a penalty of 6 => waiting 4 steps until an explosion is over should give a less negative reward
+    if e.WAITED in events: rewards -= 1
+    # The agent should usually move towards either a box or a coin or an enemy or to safety
     if action != action_to_box and action != action_to_coin and action != action_to_enemy and action != action_to_safety:
         rewards -= 0.1
+    # A bomb layed which will kill the agent or which is not in the range of a box or an enemy is usually bad
     if action == Actions.BOMB and not bomb_good and not (blast_boxes or blast_enemies):
         rewards -= 0.1
 
