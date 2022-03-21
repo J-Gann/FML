@@ -40,4 +40,4 @@ def game_events_occurred(
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
     update_action_value_last_step(self, last_game_state, last_action, events)
-    train_q_model(self, last_game_state, 5)
+    train_q_model(self, last_game_state, 100)
