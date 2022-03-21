@@ -27,8 +27,8 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.8
 LEARNING_RATE = 0.01
-EPSILON = 0#1
-EPSILON_MIN = 0#0.05
+EPSILON = 1
+EPSILON_MIN = 0.1
 EPSILON_DECREASE_RATE = 0.99
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -218,10 +218,13 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.WAITED in events: rewards -= 1
     # The agent should usually move towards either a box or a coin or an enemy or to safety
     if action != action_to_box and action != action_to_coin and action != action_to_enemy and action != action_to_safety:
-        rewards -= 0.1
+        rewards -= 0.01
     # A bomb layed which will kill the agent or which is not in the range of a box or an enemy is usually bad
     if action == Actions.BOMB and not bomb_good and not (blast_boxes or blast_enemies):
-        rewards -= 0.1
+        rewards -= 0.01
+    # If action to safety is not none the agent should usually follow its direction to not die
+    if action == action_to_safety:
+        rewards += 0.01
 
     print(rewards)
 
