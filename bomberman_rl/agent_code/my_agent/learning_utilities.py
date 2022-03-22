@@ -26,10 +26,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.8
-LEARNING_RATE = 0.01
-EPSILON = 1
-EPSILON_MIN = 0.1
-EPSILON_DECREASE_RATE = 0.99
+LEARNING_RATE = 0.2
+EPSILON = 0#1
+EPSILON_MIN = 0.05
+EPSILON_DECREASE_RATE = 0.98
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -176,56 +176,34 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
-    """
-        if action_to_safety != Actions.NONE:
-            if action == action_to_safety:
-                rewards += 1
-            else:
-                rewards -= 1
-        elif action_to_coin != Actions.NONE:
-            if action == action_to_coin:
-                rewards += 1
-            else:
-                rewards -= 1
-        elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
-            if action == Actions.BOMB:
-                rewards += 1
-            else:
-                rewards -= 1
-        elif action_to_box != Actions.NONE:
-            if action == action_to_box:
-                rewards += 1
-            else:
-                rewards -= 1
-        elif action_to_enemy != Actions.NONE:
-            if action == action_to_enemy:
-                rewards += 1
-            else:
-                rewards -= 1
+
+    if action_to_safety != Actions.NONE:
+        if action == action_to_safety:  
+           rewards += 1
         else:
-            # rewards -= 1 # Do something
-            pass
-    """
+            rewards -= 1
+    elif action_to_coin != Actions.NONE:
+        if action == action_to_coin:
+            rewards += 1
+        else:
+            rewards -= 1
+    elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
+        if action == Actions.BOMB:
+            rewards += 1
+        else:
+            rewards -= 1
+    elif action_to_box != Actions.NONE:
+        if action == action_to_box:
+            rewards += 1
+        else:
+            rewards -= 1
+    elif action_to_enemy != Actions.NONE:
+        if action == action_to_enemy:
+            rewards += 1
+        else:
+            rewards -= 1
+    else:
+        # rewards -= 1 # Do something
+        pass
 
-    if e.COIN_COLLECTED in events: rewards += 1
-    if e.CRATE_DESTROYED in events: rewards += 0.5
-    if e.KILLED_OPPONENT in events: rewards += 5
-    if e.GOT_KILLED in events: rewards -= 6
-    if e.INVALID_ACTION in events: rewards -= 0.1
-    if e.COIN_FOUND in events: rewards += 0.5
-
-    # Getting killed gives a penalty of 6 => waiting 4 steps until an explosion is over should give a less negative reward
-    if e.WAITED in events: rewards -= 1
-    # The agent should usually move towards either a box or a coin or an enemy or to safety
-    if action != action_to_box and action != action_to_coin and action != action_to_enemy and action != action_to_safety:
-        rewards -= 0.01
-    # A bomb layed which will kill the agent or which is not in the range of a box or an enemy is usually bad
-    if action == Actions.BOMB and not bomb_good and not (blast_boxes or blast_enemies):
-        rewards -= 0.01
-    # If action to safety is not none the agent should usually follow its direction to not die
-    if action == action_to_safety:
-        rewards += 0.01
-
-    print(rewards)
-
-    return rewards
+    return rewards + 50 * score_diff
