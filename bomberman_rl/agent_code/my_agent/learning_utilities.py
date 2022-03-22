@@ -180,30 +180,25 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:  
            rewards += 1
-        else:
-            rewards -= 1
-    elif action_to_coin != Actions.NONE:
+    if action_to_coin != Actions.NONE:
         if action == action_to_coin:
             rewards += 1
-        else:
-            rewards -= 1
-    elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
+    if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             rewards += 1
-        else:
-            rewards -= 1
-    elif action_to_box != Actions.NONE:
+    if action_to_box != Actions.NONE:
         if action == action_to_box:
             rewards += 1
-        else:
-            rewards -= 1
-    elif action_to_enemy != Actions.NONE:
+    if action_to_enemy != Actions.NONE:
         if action == action_to_enemy:
             rewards += 1
-        else:
-            rewards -= 1
-    else:
-        # rewards -= 1 # Do something
-        pass
 
-    return rewards + 50 * score_diff
+    if e.COIN_COLLECTED in events: rewards += 10
+    if e.CRATE_DESTROYED in events: rewards += 5
+    if e.KILLED_OPPONENT in events: rewards += 50
+    if e.GOT_KILLED in events: rewards -= 50
+    if e.WAITED in events: rewards -= 1
+
+    print(rewards)
+
+    return rewards
