@@ -26,9 +26,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.8
-LEARNING_RATE = 0.2
+LEARNING_RATE = 0.1
 EPSILON = 0#1
-EPSILON_MIN = 0.05
+EPSILON_MIN = 0.1
 EPSILON_DECREASE_RATE = 0.98
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
