@@ -25,11 +25,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
-DISCOUNT = 0.8
-LEARNING_RATE = 0.1
+DISCOUNT = 0.9
+LEARNING_RATE = 0.2
 EPSILON = 1
-EPSILON_MIN = 0.1
-EPSILON_DECREASE_RATE = 0.98
+EPSILON_MIN = 0.05
+EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -177,28 +177,33 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
 
+    local_rewards = 0
+    global_rewards = 0
+
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:  
-           rewards += 2     # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
+           local_rewards += 5     # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
     if action_to_coin != Actions.NONE:
         if action == action_to_coin:
-            rewards += 1
+            local_rewards += 1
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
-            rewards += 1
+            local_rewards += 1
     if action_to_box != Actions.NONE:
         if action == action_to_box:
-            rewards += 1
+            local_rewards += 1
     if action_to_enemy != Actions.NONE:
         if action == action_to_enemy:
-            rewards += 1
+            local_rewards += 1
 
 
-    if e.COIN_COLLECTED in events: rewards += 10
-    if e.CRATE_DESTROYED in events: rewards += 5
-    if e.KILLED_OPPONENT in events: rewards += 50
-    if e.GOT_KILLED in events: rewards -= 50
-    if e.WAITED in events: rewards -= 1
+    if e.COIN_COLLECTED in events: global_rewards += 10
+    if e.CRATE_DESTROYED in events: global_rewards += 5
+    if e.KILLED_OPPONENT in events: global_rewards += 50
+    if e.GOT_KILLED in events: global_rewards -= 50
+    if e.WAITED in events: global_rewards -= 1
+
+    rewards = local_rewards + global_rewards
 
     print(rewards)
 
