@@ -26,10 +26,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.9
-LEARNING_RATE = 0.2
-EPSILON = 0#1
+LEARNING_RATE = 0.3
+EPSILON = 1
 EPSILON_MIN = 0.005
-EPSILON_DECREASE_RATE = 0.95
+EPSILON_DECREASE_RATE = 0.9
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -189,6 +189,9 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards += 1
+    if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
+        if action == Actions.BOMB:
+            local_rewards -= 25     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
     if action_to_box != Actions.NONE:
         if action == action_to_box:
             local_rewards += 1
