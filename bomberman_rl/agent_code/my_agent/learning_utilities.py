@@ -26,7 +26,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.1
 EPSILON = 1
 EPSILON_MIN = 0.005
 EPSILON_DECREASE_RATE = 0.95
@@ -204,12 +204,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
         else:
             local_rewards -= 1
 
-    if e.COIN_COLLECTED in events: global_rewards += 10
-    if e.CRATE_DESTROYED in events: global_rewards += 5
-    if e.KILLED_OPPONENT in events: global_rewards += 50
-    if e.GOT_KILLED in events: global_rewards -= 50
-
-    rewards = local_rewards + global_rewards
+    rewards = local_rewards
 
     print(rewards)
 
