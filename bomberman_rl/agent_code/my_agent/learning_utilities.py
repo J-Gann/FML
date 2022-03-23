@@ -28,7 +28,7 @@ from sklearn.linear_model import LinearRegression
 DISCOUNT = 0.9
 LEARNING_RATE = 0.3
 EPSILON = 1
-EPSILON_MIN = 0.005
+EPSILON_MIN = 0.05
 EPSILON_DECREASE_RATE = 0.9
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -176,7 +176,6 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
-
     local_rewards = 0
     global_rewards = 0
 
@@ -188,7 +187,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
             local_rewards += 3      # Collecting a coin is more important than placing a bomb or destroying a crate or moving to an enemy
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
-            local_rewards += 1
+            local_rewards += blast_boxes + blast_enemies
     if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards -= 25     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
