@@ -27,8 +27,8 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.9
 LEARNING_RATE = 0.2
-EPSILON = 1
-EPSILON_MIN = 0.05
+EPSILON = 0#1
+EPSILON_MIN = 0.005
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -182,10 +182,10 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:  
-           local_rewards += 5     # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
+           local_rewards += 5       # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
     if action_to_coin != Actions.NONE:
         if action == action_to_coin:
-            local_rewards += 1
+            local_rewards += 3      # Collecting a coin is more important than placing a bomb or destroying a crate or moving to an enemy
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards += 1
@@ -201,7 +201,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.CRATE_DESTROYED in events: global_rewards += 5
     if e.KILLED_OPPONENT in events: global_rewards += 50
     if e.GOT_KILLED in events: global_rewards -= 50
-    if e.WAITED in events: global_rewards -= 1
+    if e.WAITED in events: global_rewards -= 0.5
 
     rewards = local_rewards + global_rewards
 
