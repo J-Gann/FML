@@ -27,7 +27,7 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.8
 LEARNING_RATE = 0.1
-EPSILON = 0#1
+EPSILON = 1
 EPSILON_MIN = 0.1
 EPSILON_DECREASE_RATE = 0.98
 MODEL_PATH = "model.joblib"
@@ -179,7 +179,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:  
-           rewards += 1
+           rewards += 2     # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
     if action_to_coin != Actions.NONE:
         if action == action_to_coin:
             rewards += 1
@@ -192,6 +192,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if action_to_enemy != Actions.NONE:
         if action == action_to_enemy:
             rewards += 1
+
 
     if e.COIN_COLLECTED in events: rewards += 10
     if e.CRATE_DESTROYED in events: rewards += 5
