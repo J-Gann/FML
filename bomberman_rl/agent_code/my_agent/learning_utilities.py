@@ -26,13 +26,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 EPSILON = 1
-EPSILON_MIN = 0.05
+EPSILON_MIN = 0.005
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
-N_STEP = 6
 
 
 def setup_learning_features(self, load_model=True):
@@ -154,7 +153,6 @@ def _train_q_model(self, action_value_data):
 
 def _rewards_from_events(self, feature_vector, events, action, score_diff):
     action = Actions[action]
-    rewards = 0
 
     feature_collector: FeatureCollector = self.feature_collector
 
@@ -177,35 +175,42 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
+    global_rewards = 0
+    local_rewards = 0
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:
-            rewards += 1
+            local_rewards += 1
         else:
-            rewards -= 1
+            local_rewards -= 1
     elif action_to_coin != Actions.NONE:
         if action == action_to_coin:
-            rewards += 1
+            local_rewards += 1
         else:
-            rewards -= 1
+            local_rewards -= 1
     elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
-            rewards += 1
+            local_rewards += 1
         else:
-            rewards -= 1
+            local_rewards -= 1
     elif action_to_box != Actions.NONE:
         if action == action_to_box:
-            rewards += 1
+            local_rewards += 1
         else:
-            rewards -= 1
+            local_rewards -= 1
     elif action_to_enemy != Actions.NONE:
         if action == action_to_enemy:
-            rewards += 1
+            local_rewards += 1
         else:
-            rewards -= 1
-    else:
-        # rewards -= 1 # Do something
-        pass
+            local_rewards -= 1
+
+    if e.COIN_COLLECTED in events: global_rewards += 10
+    if e.CRATE_DESTROYED in events: global_rewards += 5
+    if e.KILLED_OPPONENT in events: global_rewards += 50
+    if e.GOT_KILLED in events: global_rewards -= 50
+
+    rewards = local_rewards + global_rewards
 
     print(rewards)
-    return rewards + 10 * score_diff
+
+    return rewards

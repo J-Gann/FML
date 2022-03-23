@@ -38,7 +38,7 @@ def act(self, game_state: dict):
 
 
 def explore(self):
-    choice = np.random.choice(list(Actions))
+    choice = np.random.choice(list(Actions), p=[0.18, 0.18, 0.18, 0.18, 0.18, 0.1])
     self.past_moves.append(choice)
     return choice.name
 
