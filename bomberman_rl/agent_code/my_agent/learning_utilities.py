@@ -29,9 +29,9 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.9
 LEARNING_RATE = 0.3
-EPSILON = 0#1
+EPSILON = 1
 EPSILON_MIN = 0.05
-EPSILON_DECREASE_RATE = 0.9
+EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -193,9 +193,9 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
             local_rewards += 3      # Collecting a coin is more important than placing a bomb or destroying a crate or moving to an enemy
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
-            local_rewards += blast_boxes + blast_enemies
+            local_rewards += 1
         if action != Actions.BOMB and action_to_safety == Actions.NONE:  # Agent should place bombs as much as possible
-            local_rewards -= blast_boxes + blast_enemies
+            local_rewards -= 1
     if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards -= 25     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
@@ -206,21 +206,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
         if action == action_to_enemy:
             local_rewards += 1
 
-    # War tactics
-
-    if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
-        if action == action_to_enemy:  
-            local_rewards += 3      # If nearest enemy has few options to move, move towards it to attack 
-
-    if nearest_enemy_possible_moves <= 1 and action_to_enemy != Actions.NONE and enemy_distance <= 2:
-        if action == action_to_enemy:
-            local_rewards += 5     # If nearest enemy has very few options to move and agent is near, try to block enemy
-
-    if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
-        if action == Actions.BOMB:
-            local_rewards += 8     # Agent places bomb for cornered enemy
-
-    if e.COIN_COLLECTED in events: global_rewards += 10
+    if e.COIN_COLLECTED in events: global_rewards += 20
     if e.CRATE_DESTROYED in events: global_rewards += 5
     if e.KILLED_OPPONENT in events: global_rewards += 50
     if e.GOT_KILLED in events: global_rewards -= 50
