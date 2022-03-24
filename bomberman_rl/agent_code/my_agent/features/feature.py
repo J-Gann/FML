@@ -533,6 +533,9 @@ class SafetyDistance(Feature):
     def dim(self) -> int:
         return 1
 
+# - scores of enemies, own score
+# - total collected coins =? 9
+
 class FeatureCollector(Feature):
     def __init__(self, *features: List[Feature]):
         self.features: List[Feature] = features

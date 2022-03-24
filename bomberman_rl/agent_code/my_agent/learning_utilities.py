@@ -209,19 +209,16 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     # War tactics
 
     if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
-        print("BOMB1")
         if action == action_to_enemy:  
             local_rewards += 3      # If nearest enemy has few options to move, move towards it to attack 
 
     if nearest_enemy_possible_moves <= 1 and action_to_enemy != Actions.NONE and enemy_distance <= 2:
-        print("BOMB2")
         if action == action_to_enemy:
             local_rewards += 5     # If nearest enemy has very few options to move and agent is near, try to block enemy
 
     if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
-        print("BOMB3")
         if action == Actions.BOMB:
-            local_rewards += 8           # Agent places bomb for cornered enemy
+            local_rewards += 8     # Agent places bomb for cornered enemy
 
     if e.COIN_COLLECTED in events: global_rewards += 10
     if e.CRATE_DESTROYED in events: global_rewards += 5
