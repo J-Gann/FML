@@ -188,6 +188,8 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards += blast_boxes + blast_enemies
+        if action != Actions.BOMB and action_to_safety == Actions.NONE:  # Agent should place bombs as much as possible
+            local_rewards -= blast_boxes + blast_enemies
     if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards -= 25     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
