@@ -12,7 +12,9 @@ from agent_code.my_agent.features.feature import (
     PastMoves,
     PossibleActions,
     AgentFieldNeighbors,
-    AgentExplosionNeighbors
+    AgentExplosionNeighbors,
+    NearestEnemyPossibleMoves,
+    EnemyDistance
 )
 from .features.actions import Actions
 
@@ -27,8 +29,8 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.9
 LEARNING_RATE = 0.3
-EPSILON = 1
-EPSILON_MIN = 0.05
+EPSILON = 0#1
+EPSILON_MIN = 0.1#0.05
 EPSILON_DECREASE_RATE = 0.9
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -176,6 +178,10 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
+    nearest_enemy_possible_moves = feature_collector.single_feature_from_vector(feature_vector, NearestEnemyPossibleMoves)
+
+    enemy_distance = feature_collector.single_feature_from_vector(feature_vector, EnemyDistance)[0]
+
     local_rewards = 0
     global_rewards = 0
 
@@ -200,6 +206,22 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
         if action == action_to_enemy:
             local_rewards += 1
 
+    # War tactics
+
+    if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
+        print("BOMB1")
+        if action == action_to_enemy:  
+            local_rewards += 3      # If nearest enemy has few options to move, move towards it to attack 
+
+    if nearest_enemy_possible_moves <= 1 and action_to_enemy != Actions.NONE and enemy_distance <= 2:
+        print("BOMB2")
+        if action == action_to_enemy:
+            local_rewards += 10     # If nearest enemy has very few options to move and agent is near, try to block enemy
+
+    if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
+        print("BOMB3")
+        if action == Actions.BOMB:
+            local_rewards += 35           # Agent places bomb for cornered enemy
 
     if e.COIN_COLLECTED in events: global_rewards += 10
     if e.CRATE_DESTROYED in events: global_rewards += 5
