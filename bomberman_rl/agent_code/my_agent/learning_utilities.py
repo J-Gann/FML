@@ -27,10 +27,10 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
-DISCOUNT = 0.9
-LEARNING_RATE = 0.3
+DISCOUNT = 0.95
+LEARNING_RATE = 0.1
 EPSILON = 1
-EPSILON_MIN = 0.05
+EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -187,7 +187,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     if action_to_safety != Actions.NONE:
         if action == action_to_safety:  
-           local_rewards += 5       # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
+           local_rewards += 7       # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
     if action_to_coin != Actions.NONE:
         if action == action_to_coin:
             local_rewards += 3      # Collecting a coin is more important than placing a bomb or destroying a crate or moving to an enemy
@@ -211,6 +211,22 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.KILLED_OPPONENT in events: global_rewards += 50
     if e.GOT_KILLED in events: global_rewards -= 50
     if e.WAITED in events: global_rewards -= 0.5
+
+
+    # War tactics
+
+    if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
+        if action == action_to_enemy:  
+            local_rewards += 2      # If nearest enemy has few options to move, move towards it to attack 
+
+    if nearest_enemy_possible_moves <= 1 and action_to_enemy != Actions.NONE and enemy_distance <= 2:
+        if action == action_to_enemy:
+            local_rewards += 3     # If nearest enemy has very few options to move and agent is near, try to block enemy
+
+    if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
+        if action == Actions.BOMB:
+            local_rewards += 4     # Agent places bomb for cornered enemy
+
 
     rewards = local_rewards + global_rewards
 
