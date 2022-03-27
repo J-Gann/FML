@@ -29,7 +29,7 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
-EPSILON = 1
+EPSILON = 0#1
 EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
@@ -204,7 +204,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
             local_rewards -= 1
     if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
-            local_rewards -= 25     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
+            local_rewards -= 8     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
     if action_to_box != Actions.NONE:
         if action == action_to_box:
             local_rewards += 1
@@ -212,10 +212,10 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
         if action == action_to_enemy:
             local_rewards += 1
 
-    if e.COIN_COLLECTED in events: global_rewards += 20
-    if e.CRATE_DESTROYED in events: global_rewards += 5
-    if e.KILLED_OPPONENT in events: global_rewards += 50
-    if e.GOT_KILLED in events: global_rewards -= 50
+    if e.COIN_COLLECTED in events: global_rewards += 40
+    if e.CRATE_DESTROYED in events: global_rewards += 10
+    if e.KILLED_OPPONENT in events: global_rewards += 100
+    if e.GOT_KILLED in events: global_rewards -= 100
     if e.WAITED in events: global_rewards -= 1
 
 
