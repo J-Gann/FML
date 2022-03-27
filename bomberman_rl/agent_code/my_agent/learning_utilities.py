@@ -28,8 +28,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.01
-EPSILON = 0#1
+LEARNING_RATE = 0.1
+EPSILON = 1
 EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
@@ -49,6 +49,7 @@ def setup_learning_features(self, load_model=True):
     self.rewards_round = 0
     self.q_updates = 0
     self.q_updates_sum = 0
+    self.scores_sum = 0
 
     if load_model and os.path.isfile(MODEL_PATH) and os.path.isfile(ACTION_VALUE_DATA_PATH):
         self.trees = load(MODEL_PATH)
@@ -109,6 +110,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
+    self.scores_sum += last_game_state["self"][1]
 
 
 def train_q_model(self, game_state, episode_rounds, save_model=True):
@@ -116,6 +118,10 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
     if round % episode_rounds == 0:
         self.EPSILON *= EPSILON_DECREASE_RATE
         self.EPSILON = max(EPSILON_MIN, self.EPSILON)
+        if save_model:
+            dump(self.trees, MODEL_PATH + "_" + str(self.scores_sum))
+            dump(self.action_value_data, ACTION_VALUE_DATA_PATH + "_" + str(self.scores_sum))
+        self.scores_sum = 0
         self.trees = _train_q_model(self, self.action_value_data)
         if save_model:
             dump(self.trees, MODEL_PATH)
@@ -210,10 +216,8 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.CRATE_DESTROYED in events: global_rewards += 5
     if e.KILLED_OPPONENT in events: global_rewards += 50
     if e.GOT_KILLED in events: global_rewards -= 50
-    if e.WAITED in events: global_rewards -= 0.5
+    if e.WAITED in events: global_rewards -= 1
 
-
-    # War tactics
 
     if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
         if action == action_to_enemy:  
@@ -225,11 +229,9 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
         if action == Actions.BOMB:
-            local_rewards += 4     # Agent places bomb for cornered enemy
+            local_rewards += 6     # Agent places bomb for cornered enemy
 
 
     rewards = local_rewards + global_rewards
-
-    print(rewards)
 
     return rewards
