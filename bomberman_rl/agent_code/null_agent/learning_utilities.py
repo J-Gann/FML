@@ -1,5 +1,5 @@
 from argparse import Action
-from agent_code.my_agent.features.feature import (
+from agent_code.null_agent.features.feature import (
     AgentInBlastZone,
     BoxesInBlastRange,
     CouldEscapeOwnBomb,
@@ -12,11 +12,14 @@ from agent_code.my_agent.features.feature import (
     PastMoves,
     PossibleActions,
     AgentFieldNeighbors,
-    AgentExplosionNeighbors
+    AgentExplosionNeighbors,
+    NearestEnemyPossibleMoves,
+    EnemyDistance,
+    CoinDistance
 )
 from .features.actions import Actions
 
-from agent_code.my_agent.features.movement_graph import MovementGraph
+from agent_code.null_agent.features.movement_graph import MovementGraph
 import events as e
 import numpy as np
 import os
@@ -26,9 +29,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.1
-EPSILON = 1
-EPSILON_MIN = 0.005
+LEARNING_RATE = 0.2
+EPSILON = 0.01
+EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -47,6 +50,7 @@ def setup_learning_features(self, load_model=True):
     self.rewards_round = 0
     self.q_updates = 0
     self.q_updates_sum = 0
+    self.scores_sum = 0
 
     if load_model and os.path.isfile(MODEL_PATH) and os.path.isfile(ACTION_VALUE_DATA_PATH):
         self.trees = load(MODEL_PATH)
@@ -107,6 +111,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
 
     self.q_updates_sum += q_value_old + q_value_new
     self.q_updates += 1
+    self.scores_sum += last_game_state["self"][1]
 
 
 def train_q_model(self, game_state, episode_rounds, save_model=True):
@@ -114,6 +119,10 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
     if round % episode_rounds == 0:
         self.EPSILON *= EPSILON_DECREASE_RATE
         self.EPSILON = max(EPSILON_MIN, self.EPSILON)
+        if save_model:
+            dump(self.trees, MODEL_PATH + "_" + str(self.scores_sum))
+            dump(self.action_value_data, ACTION_VALUE_DATA_PATH + "_" + str(self.scores_sum))
+        self.scores_sum = 0
         self.trees = _train_q_model(self, self.action_value_data)
         if save_model:
             dump(self.trees, MODEL_PATH)
@@ -175,37 +184,58 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
 
-    global_rewards = 0
+    nearest_enemy_possible_moves = feature_collector.single_feature_from_vector(feature_vector, NearestEnemyPossibleMoves)
+
+    enemy_distance = feature_collector.single_feature_from_vector(feature_vector, EnemyDistance)[0]
+    coin_distance = feature_collector.single_feature_from_vector(feature_vector, CoinDistance)[0]
+
+
     local_rewards = 0
+    global_rewards = 0
 
     if action_to_safety != Actions.NONE:
-        if action == action_to_safety:
-            local_rewards += 1
-        else:
-            local_rewards -= 1
-    elif action_to_coin != Actions.NONE:
+        if action == action_to_safety:  
+           local_rewards += 7       # Agent should really escape a bomb when necessary (penalty of death is not incentivizing escape enough)
+    if action_to_coin != Actions.NONE:
         if action == action_to_coin:
-            local_rewards += 1
-        else:
-            local_rewards -= 1
-    elif can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
+            local_rewards += 3      # Collecting a coin is more important than placing a bomb or destroying a crate or moving to an enemy
+    if can_place_bomb and bomb_good and (blast_boxes > 0 or blast_enemies > 0):
         if action == Actions.BOMB:
             local_rewards += 1
-        else:
+        if action != Actions.BOMB and action_to_safety == Actions.NONE:  # Agent should place bombs as much as possible
             local_rewards -= 1
-    elif action_to_box != Actions.NONE:
+    if can_place_bomb and bomb_good and not (blast_boxes > 0 or blast_enemies > 0):
+        if action == Actions.BOMB:
+            local_rewards -= 8     # Prevent Agent from rewarding itself by escaping its own bomb repeatedly
+    if action_to_box != Actions.NONE:
         if action == action_to_box:
             local_rewards += 1
-        else:
-            local_rewards -= 1
-    elif action_to_enemy != Actions.NONE:
+    if action_to_enemy != Actions.NONE:
         if action == action_to_enemy:
             local_rewards += 1
-        else:
-            local_rewards -= 1
 
-    rewards = local_rewards
+    if e.COIN_COLLECTED in events: global_rewards += 40
+    if e.CRATE_DESTROYED in events: global_rewards += 10
+    if e.KILLED_OPPONENT in events: global_rewards += 100
+    if e.GOT_KILLED in events: global_rewards -= 100
+    if e.WAITED in events: global_rewards -= 0.5
 
-    print(rewards)
+    if action_to_box != Actions.NONE and action_to_enemy == Actions.NONE and action_to_coin == Actions.NONE:
+        if action == action_to_box:
+            global_rewards += 10
+
+    if action_to_coin != Actions.NONE and coin_distance < 5:
+        if action == action_to_coin:
+            global_rewards += 10
+
+
+    if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
+        if action == Actions.BOMB:
+            local_rewards += 10     # Agent places bomb for cornered enemy
+
+
+    
+
+    rewards = local_rewards + global_rewards
 
     return rewards

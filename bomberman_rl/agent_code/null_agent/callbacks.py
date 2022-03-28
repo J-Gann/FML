@@ -1,6 +1,6 @@
 import numpy as np
 
-from agent_code.my_agent.features.feature import FeatureCollector, MoveNextToNearestBox, MoveToNearestCoin
+from agent_code.null_agent.features.feature import FeatureCollector, MoveNextToNearestBox, MoveToNearestCoin
 from enum import Enum
 from joblib import load
 import os
