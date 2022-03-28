@@ -1,5 +1,5 @@
 from argparse import Action
-from agent_code.my_agent.features.feature import (
+from agent_code.null_agent.features.feature import (
     AgentInBlastZone,
     BoxesInBlastRange,
     CouldEscapeOwnBomb,
@@ -14,11 +14,12 @@ from agent_code.my_agent.features.feature import (
     AgentFieldNeighbors,
     AgentExplosionNeighbors,
     NearestEnemyPossibleMoves,
-    EnemyDistance
+    EnemyDistance,
+    CoinDistance
 )
 from .features.actions import Actions
 
-from agent_code.my_agent.features.movement_graph import MovementGraph
+from agent_code.null_agent.features.movement_graph import MovementGraph
 import events as e
 import numpy as np
 import os
@@ -28,9 +29,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.2
 EPSILON = 0.01
-EPSILON_MIN = 0.0001
+EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
@@ -187,6 +188,8 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     nearest_enemy_possible_moves = feature_collector.single_feature_from_vector(feature_vector, NearestEnemyPossibleMoves)
 
     enemy_distance = feature_collector.single_feature_from_vector(feature_vector, EnemyDistance)[0]
+    coin_distance = feature_collector.single_feature_from_vector(feature_vector, CoinDistance)[0]
+
 
     local_rewards = 0
     global_rewards = 0
@@ -219,18 +222,13 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.WAITED in events: global_rewards -= 0.5
 
     if action_to_box != Actions.NONE and action_to_enemy == Actions.NONE and action_to_coin == Actions.NONE:
-        if action != action_to_box:
+        if action == action_to_box:
             global_rewards += 10
 
-            
+    if action_to_coin != Actions.NONE and coin_distance < 5:
+        if action == action_to_coin:
+            global_rewards += 10
 
-    if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
-        if action == action_to_enemy:  
-            local_rewards += 2      # If nearest enemy has few options to move, move towards it to attack 
-
-    if nearest_enemy_possible_moves <= 1 and action_to_enemy != Actions.NONE and enemy_distance <= 2:
-        if action == action_to_enemy:
-            local_rewards += 3     # If nearest enemy has very few options to move and agent is near, try to block enemy
 
     if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
         if action == Actions.BOMB:
