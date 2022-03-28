@@ -29,9 +29,9 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
-EPSILON = 0#1
-EPSILON_MIN = 0.01
-EPSILON_DECREASE_RATE = 0.95
+EPSILON = 1
+EPSILON_MIN = 0.001
+EPSILON_DECREASE_RATE = 0.8
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -216,7 +216,7 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.CRATE_DESTROYED in events: global_rewards += 10
     if e.KILLED_OPPONENT in events: global_rewards += 100
     if e.GOT_KILLED in events: global_rewards -= 100
-    if e.WAITED in events: global_rewards -= 1
+    if e.WAITED in events: global_rewards -= 0.5
 
 
     if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
@@ -229,8 +229,10 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
 
     if nearest_enemy_possible_moves <= 1 and enemy_distance <= 3 and can_place_bomb and bomb_good and blast_enemies > 0:
         if action == Actions.BOMB:
-            local_rewards += 6     # Agent places bomb for cornered enemy
+            local_rewards += 10     # Agent places bomb for cornered enemy
 
+
+    
 
     rewards = local_rewards + global_rewards
 
