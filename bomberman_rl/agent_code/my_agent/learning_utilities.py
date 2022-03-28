@@ -29,9 +29,9 @@ from sklearn.linear_model import LinearRegression
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.1
-EPSILON = 1
-EPSILON_MIN = 0.001
-EPSILON_DECREASE_RATE = 0.8
+EPSILON = 0.01
+EPSILON_MIN = 0.0001
+EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
 ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
@@ -218,6 +218,11 @@ def _rewards_from_events(self, feature_vector, events, action, score_diff):
     if e.GOT_KILLED in events: global_rewards -= 100
     if e.WAITED in events: global_rewards -= 0.5
 
+    if action_to_box != Actions.NONE and action_to_enemy == Actions.NONE and action_to_coin == Actions.NONE:
+        if action != action_to_box:
+            global_rewards += 10
+
+            
 
     if nearest_enemy_possible_moves <= 2 and action_to_enemy != Actions.NONE:
         if action == action_to_enemy:  
