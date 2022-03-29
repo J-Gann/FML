@@ -2,7 +2,6 @@ from typing import List, Tuple
 import math
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
-
 from .actions import Actions
 import settings as s
 
@@ -12,9 +11,9 @@ COLS, ROWS = 17, 17
 def bomb_indices(game_state: dict) -> List[Tuple]:
     return [(bomb[0][0], bomb[0][1]) for bomb in game_state["bombs"]]
 
+
 def enemy_indices(game_state: dict) -> List[Tuple]:
     return [(other[3][0], other[3][1]) for other in game_state["others"]]
-
 
 
 def to_node(index):
@@ -27,6 +26,7 @@ def to_index(node):
 
 class MovementGraph:
     def __init__(self, game_state: dict) -> None:
+        # Initialize some variables for easy access
         self.field = game_state["field"]
         self.explosion_map = game_state["explosion_map"]
         self.bomb_indices = bomb_indices(game_state)
@@ -36,6 +36,8 @@ class MovementGraph:
         self.enemies = game_state["others"]
         self.enemy_indices = enemy_indices(game_state)
         self.obstructed = {}
+        # Create an adjacency matrix of the game field. Each field is interpreted as a node. A path between two nodes
+        # exist if the corresponding fields lie next to each other and neither of the nodes is obstructed by e.g. a wall.
         row = []
         col = []
         data = []
@@ -46,30 +48,36 @@ class MovementGraph:
                     if self.is_within_field(nx, ny):
                         node = to_node((x, y))
                         neighbor = to_node((nx, ny))
-                        node_obstructed = self._node_obstructed(node)
+                        node_obstructed = self._node_obstructed(
+                            node)   # Check if node is obstructed
                         self.obstructed[node] = node_obstructed
-                        neighbor_obstructed = self._node_obstructed(neighbor)
-                        if not node_obstructed and not neighbor_obstructed:
+                        neighbor_obstructed = self._node_obstructed(
+                            neighbor)   # Check if node is obstructed
+                        if not node_obstructed and not neighbor_obstructed:  # Only add edge if neither nodes are obstructed
                             row.append(node)
                             col.append(neighbor)
                             data.append(1)
         self.matrix = csr_matrix((data, (row, col)))
 
     def is_within_field(self, x: int, y: int) -> bool:
+        """Check if a coordinate is within the size of the field"""
         return 0 <= x < COLS and 0 <= y < ROWS
 
     def _node_obstructed(self, node):
+        """Helper function to index_obstructed"""
         # Check if the field is obstructed at the node by wither a wall, a boy or an explosion
         x, y = to_index(node)
         return self._index_obstructed((x, y))
 
-
     def nearest_index(self, indices):
+        """Helper function for nearest_node"""
         nodes = [to_node(index) for index in indices]
         nearest_node = self.nearest_node(nodes)
-        if nearest_node != None: return to_index(nearest_node)
+        if nearest_node != None:
+            return to_index(nearest_node)
 
     def nearest_node(self, nodes):
+        """Compute which of the passed nodes is the one nearest to the current agent position"""
         nodes = self.remove_obstructed_nodes(nodes)
         nodes = self.remove_nodes_out_of_range(nodes)
         if len(nodes) == 0:
@@ -86,14 +94,18 @@ class MovementGraph:
             # Agent node is currently seperated from all other nodes and is therefore not contained in the movement_graph
             return None
         source = sources[self.agent_node]
-        if source != -9999: return source
-        else: return None
+        if source != -9999:
+            return source
+        else:
+            return None
 
     def nearest_distance_index(self, index):
+        """Helper function for nearest_distance_node"""
         node = to_node(index)
         return self.nearest_distance_node(node)
 
     def nearest_distance_node(self, node):
+        """Computes the distance to the nearest of the passed nodes"""
         if node == None:
             return None
         distances, predecessors, sources = dijkstra(
@@ -115,6 +127,7 @@ class MovementGraph:
             return None
 
     def next_step_to_nearest_node(self, nodes):
+        """Compute the next step which would move the agent towards the nearest of the passed nodes"""
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self.remove_obstructed_nodes(nodes)
         nodes = self.remove_nodes_out_of_range(nodes)
@@ -149,15 +162,22 @@ class MovementGraph:
             return Actions.NONE
 
     def index_obstructed(self, index):
+        """Check if the index is obstructed"""
         node = to_node(index)
-        if node in self.obstructed: return self.obstructed[node]
-        else: return True
+        if node in self.obstructed:
+            return self.obstructed[node]
+        else:
+            return True
 
     def node_obstructed(self, node):
-        if node in self.obstructed: return self.obstructed[node]
-        else: return True
+        """Check if the node is obstructed"""
+        if node in self.obstructed:
+            return self.obstructed[node]
+        else:
+            return True
 
     def _index_obstructed(self, index):
+        """Compute for a given game state which nodes are obstructed by e.g a wall"""
         # Check if the field is obstructed at the index by either a wall, a box, an explosion or an out of range error
         x, y = index
         in_range = 0 <= x < s.COLS and 0 <= y < s.ROWS
@@ -196,16 +216,19 @@ class MovementGraph:
         return is_wall or is_box or is_explosion or not in_range or is_bomb or is_explosion_in_next_step or is_enemy
 
     def _node_in_movement_range(self, node):
+        """Validate if a node can be reached by any other node"""
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
         # These nodes are not added to the movement_graph during creation of the adjacency list.
         # Therefore not filtering them out leads to out of range errors.
         return node < self.matrix.shape[0]
 
     def _index_in_movement_range(self, index):
+        """Helper function for _node_in_movement_range"""
         node = to_node(index)
         return self._node_in_movement_range(node)
 
     def remove_obstructed_nodes(self, nodes):
+        """Remove nodes which are obstructed"""
         free_nodes = []
         for node in nodes:
             if not self.node_obstructed(node):
@@ -213,6 +236,7 @@ class MovementGraph:
         return free_nodes
 
     def remove_nodes_out_of_range(self, nodes):
+        """Remove nodes which can not be reached by any other node"""
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
         # These nodes are not added to the movement_graph during creation of the adjacency list.
         # Therefore not filtering them out leads to out of range errors.
@@ -223,10 +247,12 @@ class MovementGraph:
         return free_nodes
 
     def next_step_to_nearest_index(self, indices):
+        """Helper function for next_step_to_nearest_node"""
         nodes = [to_node(index) for index in indices]
         return self.next_step_to_nearest_node(nodes)
 
     def blast_indices(self):
+        """Compute which indices are currently under blast"""
         blast_indices = []
         for x, y in self.bomb_indices:
             blast_indices.append((x, y))
@@ -253,5 +279,6 @@ class MovementGraph:
         return blast_indices
 
     def blast_nodes(self):
+        """Helper function for blast_indices"""
         blast_indices = self.blast_indices()
         return [to_node(index) for index in blast_indices]

@@ -1,43 +1,20 @@
-from abc import ABCMeta, abstractmethod
-from typing import List
-import numpy as np
-import copy
-from .movement_graph import MovementGraph, to_node
-from .actions import Actions
-
-import settings as s
-
-BOMB_POWER = 3
-BOMB_TIMER = 4
-EXPLOSION_TIMER = 2
-
-import numpy as np
-from enum import Enum, auto
-
 from .feature_utils import (
-    crate_positions,
     format_boolean,
     format_position,
     get_enemy_positions,
-    k_closest,
-    manhattan_distance,
-    pad_matrix,
-    positions,
     ROWS,
     COLS,
     action_new_index,
     get_agent_position,
     camel_to_snake_case,
 )
-
-### feature extraction parameter ###
-
-K_NEAREST_CRATES = 1
-K_NEAREST_COINS = 1
-K_NEAREST_EXPLOSIONS = 1
-K_NEAREST_BOMBS = 1
-
-####################################
+from abc import ABCMeta, abstractmethod
+from typing import List
+import numpy as np
+import copy
+from .movement_graph import MovementGraph, to_node
+from .actions import Actions
+import settings as s
 
 
 class Feature(metaclass=ABCMeta):
@@ -95,110 +72,6 @@ class BombDropPossible(BooleanFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         bomb_possible = game_state["self"][-2]
         return np.array([int(bomb_possible)])
-
-
-# TODO: more than one field
-class ExplosionDirections(TwoDimensionalFeature):
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        explosion_map = game_state["explosion_map"].T
-        position = get_agent_position(game_state)
-
-        explosion_positions = positions[explosion_map == 1]
-        explosion_positions = k_closest(position, explosion_positions, k=K_NEAREST_EXPLOSIONS)
-        explosion_direction = explosion_positions - position
-        return explosion_direction
-
-
-class CoinDirections(TwoDimensionalFeature):
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        position = get_agent_position(game_state)
-        coins = np.array(game_state["coins"])
-        closest_coins = k_closest(position, coins, k=K_NEAREST_COINS)
-        coin_directions = closest_coins - position
-        return coin_directions
-
-
-class OpponentDirections(Feature):
-    def __init__(self, number_of_opponents=3) -> None:
-        super().__init__()
-        self.number_of_opponents = number_of_opponents
-
-    def dim(self) -> int:
-        return 2 * self.number_of_opponents
-
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        position = get_agent_position(game_state)
-        others = game_state["others"]
-
-        others_positions = np.array([other[3] for other in others])
-        others_positions = pad_matrix(others_positions, self.number_of_opponents)
-        others_directions = others_positions - position
-        return others_directions
-
-    def format_feature(self, feature_vector: np.array) -> str:
-        positions = [format_position(feature_vector[i : i + 2]) for i in range(3)]
-        sep = "\n    "
-        return sep + sep.join(positions)
-
-
-class Walls(Feature):
-    def dim(self) -> int:
-        return 4
-
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        x, y = get_agent_position(game_state)
-        field = game_state["field"]
-        # indicates whether top, left, down, right there is a wall next to agent
-        walls = (np.array([field[x, y - 1], field[x - 1, y], field[x, y + 1], field[x + 1, y]]) == -1).astype(np.int)
-        return walls
-
-    def format_feature(self, feature_vector):
-        sep = "\n    "
-        return sep + sep.join(
-            [
-                f"{dir}: {is_wall}"
-                for dir, is_wall in zip(["top", "left", "down", "right"], map(format_boolean, feature_vector))
-            ]
-        )
-
-
-# TODO: more than one crate
-class CrateDirection(TwoDimensionalFeature):
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        position = get_agent_position(game_state)
-        field = game_state["field"]
-
-        nearest_crates = k_closest(position, crate_positions(field), k=K_NEAREST_CRATES)
-        crates_direction = nearest_crates - position
-        return crates_direction
-
-
-# TODO: more than one bomb
-class BombDirection(TwoDimensionalFeature):
-    def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        """
-        Bombs are only relevant in a radius of 7 boxes.
-        Since it extends 3 in each direction and explodes after three steps.
-        So the player can reach the explotion zone in a 7 boxes radius.
-
-        Vector has dimension 4 x 2 and is filled with zeros.
-        """
-        position = get_agent_position(game_state)
-        bombs = game_state["bombs"]
-
-        if len(bombs) == 0:
-            return np.zeros((K_NEAREST_BOMBS, 2))
-
-        bomb_positions = np.array([bomb[0] for bomb in bombs])
-        bomb_steps = np.array([bomb[1] for bomb in bombs])
-        distances = manhattan_distance(position, bomb_positions)
-
-        within_range = (distances - bomb_steps - 1 - BOMB_POWER - EXPLOSION_TIMER) < 1
-        bomb_positions = bomb_positions[within_range]
-        bomb_positions = k_closest(position, bomb_positions, k=K_NEAREST_BOMBS, pad=False)
-
-        bomb_direction = bomb_positions - position
-        return pad_matrix(bomb_direction, K_NEAREST_BOMBS)
 
 
 class MoveToNearestCoin(ActionFeature):
@@ -307,7 +180,7 @@ class PastMoves(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         if len(self_obj.past_moves) < self.n:
             return np.array([-1 for i in range(self.n)])
-        return np.array([action.value for action in self_obj.past_moves[-self.n :]])
+        return np.array([action.value for action in self_obj.past_moves[-self.n:]])
 
 
 class BoxesInBlastRange(Feature):
@@ -344,7 +217,8 @@ class BoxesInBlastRange(Feature):
 
 class AgentInBlastZone(BooleanFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
-        in_blast_zone = to_node(get_agent_position(game_state)) in self_obj.movement_graph.blast_nodes()
+        in_blast_zone = to_node(get_agent_position(
+            game_state)) in self_obj.movement_graph.blast_nodes()
         return np.array([int(in_blast_zone)])
 
 
@@ -362,7 +236,8 @@ class PossibleActions(Feature):
                 res.append(int(game_state["self"][2]))
             else:
                 new_index = action_new_index(agent_position, action)
-                obstructed = self_obj.movement_graph.index_obstructed(new_index)
+                obstructed = self_obj.movement_graph.index_obstructed(
+                    new_index)
                 res.append(int(not obstructed))
         return np.array(res)
 
@@ -370,9 +245,11 @@ class PossibleActions(Feature):
 class CouldEscapeOwnBomb(BooleanFeature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         old_bomb_indices = copy.deepcopy(self_obj.movement_graph.bomb_indices)
-        self_obj.movement_graph.bomb_indices.append(get_agent_position(game_state))
+        self_obj.movement_graph.bomb_indices.append(
+            get_agent_position(game_state))
 
-        res = move_out_of_blast_zone(game_state, self_obj.movement_graph) != Actions.NONE
+        res = move_out_of_blast_zone(
+            game_state, self_obj.movement_graph) != Actions.NONE
 
         self_obj.movement_graph.bomb_indices = old_bomb_indices
         self.bomb_indices = old_bomb_indices
@@ -406,6 +283,7 @@ class AgentFieldNeighbors(Feature):
     def dim(self) -> int:
         return 8
 
+
 class AgentExplosionNeighbors(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         neighbors = []
@@ -434,6 +312,8 @@ class AgentExplosionNeighbors(Feature):
 
 # If the enemy can move in only one or two directions and our agent can find a
 # path to the enemy, he should place a bomb next to him
+
+
 class NearestEnemyPossibleMoves(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         enemy_indices = get_enemy_positions(game_state)
@@ -441,10 +321,14 @@ class NearestEnemyPossibleMoves(Feature):
         if nearest_index != None:
             x, y = nearest_index
             enemy_movement_range = 0
-            if self_obj.movement_graph.index_obstructed((x + 1, y)): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed((x - 1, y)): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed((x, y + 1)): enemy_movement_range += 1
-            if self_obj.movement_graph.index_obstructed((x, y - 1)): enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x + 1, y)):
+                enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x - 1, y)):
+                enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x, y + 1)):
+                enemy_movement_range += 1
+            if self_obj.movement_graph.index_obstructed((x, y - 1)):
+                enemy_movement_range += 1
             return np.array([enemy_movement_range])
         else:
             return np.array([-1])
@@ -452,17 +336,23 @@ class NearestEnemyPossibleMoves(Feature):
     def dim(self) -> int:
         return 1
 
+
 class CoinDistance(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         coin_indices = game_state["coins"]
         nearest_index = self_obj.movement_graph.nearest_index(coin_indices)
-        if nearest_index == None: return np.array([-1])
-        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
-        if distance != None: return np.array([distance])
-        else: return np.array([-1])
+        if nearest_index == None:
+            return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(
+            nearest_index)
+        if distance != None:
+            return np.array([distance])
+        else:
+            return np.array([-1])
 
     def dim(self) -> int:
         return 1
+
 
 class BoxDistance(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
@@ -478,13 +368,18 @@ class BoxDistance(Feature):
         if get_agent_position(game_state) in box_neighbors:
             return np.array([0])
         nearest_index = self_obj.movement_graph.nearest_index(box_neighbors)
-        if nearest_index == None: return np.array([-1])
-        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
-        if distance != None: return np.array([distance])
-        else: return np.array([-1])
+        if nearest_index == None:
+            return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(
+            nearest_index)
+        if distance != None:
+            return np.array([distance])
+        else:
+            return np.array([-1])
 
     def dim(self) -> int:
         return 1
+
 
 class EnemyDistance(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
@@ -500,13 +395,18 @@ class EnemyDistance(Feature):
         if get_agent_position(game_state) in enemy_neighbors:
             return np.array([0])
         nearest_index = self_obj.movement_graph.nearest_index(enemy_neighbors)
-        if nearest_index == None: return np.array([-1])
-        distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
-        if distance != None: return np.array([distance])
-        else: return np.array([-1])
+        if nearest_index == None:
+            return np.array([-1])
+        distance = self_obj.movement_graph.nearest_distance_index(
+            nearest_index)
+        if distance != None:
+            return np.array([distance])
+        else:
+            return np.array([-1])
 
     def dim(self) -> int:
         return 1
+
 
 class SafetyDistance(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
@@ -523,10 +423,14 @@ class SafetyDistance(Feature):
                     free_indices.append(index)
         if agent_position in blast_indices:
             nearest_index = self_obj.movement_graph.nearest_index(free_indices)
-            if nearest_index == None: return np.array([-1])
-            distance = self_obj.movement_graph.nearest_distance_index(nearest_index)
-            if distance != None: return np.array([distance])
-            else: return np.array([-1])
+            if nearest_index == None:
+                return np.array([-1])
+            distance = self_obj.movement_graph.nearest_distance_index(
+                nearest_index)
+            if distance != None:
+                return np.array([distance])
+            else:
+                return np.array([-1])
         else:
             return np.array([-1])
 
@@ -535,6 +439,7 @@ class SafetyDistance(Feature):
 
 # - scores of enemies, own score
 # - total collected coins =? 9
+
 
 class FeatureCollector(Feature):
     def __init__(self, *features: List[Feature]):
@@ -546,7 +451,8 @@ class FeatureCollector(Feature):
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         self_obj.movement_graph = MovementGraph(game_state)
 
-        vecs = [f.compute_feature(game_state, self_obj).flatten() for f in self.features]
+        vecs = [f.compute_feature(game_state, self_obj).flatten()
+                for f in self.features]
 
         return np.concatenate(vecs)
 
@@ -555,7 +461,7 @@ class FeatureCollector(Feature):
 
         index = 0
         for f in self.features:
-            v = feature_vector[index : index + f.dim()]
+            v = feature_vector[index: index + f.dim()]
             explainations.append(f.explain_feature(v))
             index += f.dim()
 
@@ -566,7 +472,7 @@ class FeatureCollector(Feature):
 
         for f in self.features:
             if isinstance(f, feature_class):
-                return feature_vector[index : index + f.dim()]
+                return feature_vector[index: index + f.dim()]
             index += f.dim()
 
         raise ValueError(f"no entry in feature collector for {feature_class}")
