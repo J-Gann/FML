@@ -1,3 +1,6 @@
+import pathlib
+import sys
+import pandas as pd
 import events as e
 import numpy as np
 import os
@@ -16,13 +19,13 @@ from agent_code.null_agent.features.feature import (
     PossibleActions,
     NearestEnemyPossibleMoves,
     EnemyDistance,
-    CoinDistance
+    CoinDistance,
 )
 from .features.actions import Actions
 
 DISCOUNT = 0.95
 LEARNING_RATE = 0.2
-EPSILON = 0.01
+EPSILON = 1.0
 EPSILON_MIN = 0.01
 EPSILON_DECREASE_RATE = 0.95
 MODEL_PATH = "model.joblib"
@@ -33,8 +36,7 @@ def setup_learning_features(self, load_model=True):
     self.EPSILON = EPSILON
     # Object where the experience of the agent is stored.
     # State-reward pairs are inserted into the action-object which resulted in the rewards.
-    self.action_value_data = {"UP": {}, "DOWN": {},
-                              "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {}}
+    self.action_value_data = {"UP": {}, "DOWN": {}, "LEFT": {}, "RIGHT": {}, "WAIT": {}, "BOMB": {}}
     self.scores_sum = 0  # Keep track of the toal scores a model achieved
 
     # Load an existing model if possible
@@ -54,8 +56,14 @@ def setup_learning_features(self, load_model=True):
             "BOMB": RandomForestRegressor(),
         }
         for action_tree in self.trees:
-            self.trees[action_tree].fit(
-                np.array(np.zeros(self.feature_collector.dim())).reshape(1, -1), [0])
+            self.trees[action_tree].fit(np.array(np.zeros(self.feature_collector.dim())).reshape(1, -1), [0])
+
+    self.training_results = []
+    self.best_5_models = []
+    self.reward_history = []
+    self.last_round_with_improvement = 0
+    self.q_value_history = []
+    self.q_update_history = []
 
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
@@ -70,50 +78,107 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
     q_value_old = self.trees[self_action].predict(old_features.reshape(1, -1))
     # Compute the expected q-value knowing the reward of the current action and the expected future rewards
     q_value_new = rewards + DISCOUNT * np.max(
-        [self.trees[action_tree].predict(
-            new_features.reshape(1, -1)) for action_tree in self.trees]
+        [self.trees[action_tree].predict(new_features.reshape(1, -1)) for action_tree in self.trees]
     )
     # Update the experience
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[self_action][tuple(
-        old_features)] = q_value_old + q_value_update
+    self.action_value_data[self_action][tuple(old_features)] = q_value_old + q_value_update
 
 
 def update_action_value_last_step(self, last_game_state, last_action, events):
     """Use a transition to update the experience of the agent using q-learning."""
-    old_features = self.feature_collector.compute_feature(
-        last_game_state, self)
+    old_features = self.feature_collector.compute_feature(last_game_state, self)
     rewards = _rewards_from_events(self, old_features, events, last_action)
     q_value_old = self.trees[last_action].predict(old_features.reshape(1, -1))
     q_value_new = rewards + 0
     q_value_update = LEARNING_RATE * (q_value_new - q_value_old)
-    self.action_value_data[last_action][tuple(
-        old_features)] = q_value_old + q_value_update
+    self.action_value_data[last_action][tuple(old_features)] = q_value_old + q_value_update
     self.scores_sum += last_game_state["self"][1]
 
+    self.q_value_history.append(q_value_new)
+    self.q_update_history.append(q_value_update)
 
-def train_q_model(self, game_state, episode_rounds, save_model=True):
-    round = game_state["round"]
-    if round % episode_rounds == 0:
-        # Reduce epsilon by epsilon decrease rate
-        self.EPSILON *= EPSILON_DECREASE_RATE
-        # Do no go below minimum epsilon
-        self.EPSILON = max(EPSILON_MIN, self.EPSILON)
-        if save_model:  # Save model along with the scores it achieved
-            dump(self.trees, MODEL_PATH + "_" + str(self.scores_sum))
-            dump(self.action_value_data, ACTION_VALUE_DATA_PATH +
-                 "_" + str(self.scores_sum))
-        self.scores_sum = 0  # Reset scores to 0 for next model
-        # Train new model using all experience
-        self.trees = _train_q_model(self, self.action_value_data)
-        if save_model:
-            # Save currently used model
-            dump(self.trees, MODEL_PATH)
-            dump(self.action_value_data, ACTION_VALUE_DATA_PATH)
+
+def train_q_model(self, game_state, rounds_per_episode, save_model=True):
+    model_hash = abs(hash(str({k: hash(v) for k, v in self.trees.items()})))
+    score_avg = self.scores_sum / (game_state["round"] % rounds_per_episode + 1)
+
+    training_result = {
+        "round": game_state["round"],
+        "scores_sum": self.scores_sum,
+        "score_avg": score_avg,
+        "hash": model_hash,
+        "epsilon": self.EPSILON,
+        "steps": game_state["step"],
+    }
+
+    # only update every rounds_per_episode round
+    if game_state["round"] % rounds_per_episode != 0:
+        # only add training results without scores since no traiing is done
+        self.training_results.append(training_result)
+
+        return
+
+    # Reduce epsilon by epsilon decrease rate, do no go below minimum epsilon
+    self.EPSILON = max(EPSILON_MIN, self.EPSILON * EPSILON_DECREASE_RATE)
+
+    # Train new model using all experience
+    self.trees, scores = _train_q_model(self, self.action_value_data)
+    print("test/train score:", sum(scores.values()) / len(scores))
+
+    self.training_results.append({**training_result, **scores})
+
+    best_5_model_hashes = update_best_5_models(self, game_state, score_avg, training_result)
+
+    # make sure model dir exists
+    regressor_name = self.trees["UP"].__class__.__name__
+    data_dir = f"data/{regressor_name}"
+    model_dir = f"{data_dir}/models"
+    action_value_dir = f"{data_dir}/action_value"
+    pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(action_value_dir).mkdir(parents=True, exist_ok=True)
+
+    # only save the current model if it is among the best five models
+    if save_model and model_hash in best_5_model_hashes:
+        # Save model along with the scores it achieved
+        dump(self.trees, f"{model_dir}/{model_hash}_score_{self.scores_sum}.joblib")
+        dump(self.action_value_data, f"{action_value_dir}/{model_hash}_score_{self.scores_sum}.joblib")
+
+        open(f"{data_dir}/best_model_hash.txt", "w").write(str(best_5_model_hashes[0]))
+
+    # delete old models
+    for model_file in os.listdir(model_dir):
+        model_hash = int(model_file.split("_")[0])
+        if model_hash not in best_5_model_hashes:
+            os.remove(f"{model_dir}/{model_file}")
+
+    self.scores_sum = 0  # Reset scores to 0 for next model
+
+    if game_state["round"] % 20 == 0:
+        pd.DataFrame(self.training_results).to_csv(f"{data_dir}/training_results.csv")
+        pd.DataFrame(self.reward_history).to_csv(f"{data_dir}/reward_histroy.csv")
+        pd.DataFrame(self.q_value_history).to_csv(f"{data_dir}/q_value_history.csv")
+        pd.DataFrame(self.q_update_history).to_csv(f"{data_dir}/q_update_history.csv")
+
+
+def update_best_5_models(self, game_state, score_avg, training_result):
+    # if current model is better than one of the 5 best, add it and remove the worst
+    print("best five model scores", *[m["score_avg"] for m in self.best_5_models])
+
+    worst_score = min(*[m["score_avg"] for m in self.best_5_models], 0, 0)
+    if score_avg > worst_score:
+        self.best_5_models.append(training_result)
+        self.best_5_models.sort(key=lambda x: x["score_avg"], reverse=True)
+        self.best_5_models = self.best_5_models[:5]
+        self.last_round_with_improvement = game_state["round"]
+
+    best_5_model_hashes = [m["hash"] for m in self.best_5_models]
+    return best_5_model_hashes
 
 
 def _train_q_model(self, action_value_data):
-    new_trees = {}
+    new_trees = dict()
+    scores = dict()
     for action in Actions:  # Train a new regression forest for each action
         if action == Actions.NONE:
             continue  # Do not train a model for the "noop"
@@ -133,48 +198,43 @@ def _train_q_model(self, action_value_data):
         features = np.array(features)
         values = np.ravel(np.array(values))
         # Create training and test set
-        X_train, X_test, y_train, y_test = train_test_split(
-            features, values, test_size=0.33)
+        X_train, X_test, y_train, y_test = train_test_split(features, values, test_size=0.33)
         # Fit new forest
         new_tree.fit(X_train, y_train)
         # Log performance of the model
-        print("Epsilon:", self.EPSILON)
-        print("Tree score test", action, new_tree.score(X_test, y_test))
-        print("Tree score train", action, new_tree.score(X_train, y_train))
+        train_score = new_tree.score(X_train, y_train)
+        test_score = new_tree.score(X_test, y_test)
+        scores[f"train_{action}"] = train_score
+        scores[f"test_{action}"] = test_score
+
+        # print("Epsilon:", self.EPSILON)
+        # print("Tree score test", action, test_score)
+        # print("Tree score train", action, train_score)
         new_trees[action] = new_tree
-    return new_trees
+    return new_trees, scores
 
 
 def _rewards_from_events(self, feature_vector, events, action):
     action = Actions[action]
     feature_collector: FeatureCollector = self.feature_collector
-    action_to_coin = feature_collector.single_feature_from_vector(
-        feature_vector, MoveToNearestCoin)
+    action_to_coin = feature_collector.single_feature_from_vector(feature_vector, MoveToNearestCoin)
     action_to_coin = Actions.from_one_hot(action_to_coin)
-    action_to_safety = feature_collector.single_feature_from_vector(
-        feature_vector, MoveOutOfBlastZone)
+    action_to_safety = feature_collector.single_feature_from_vector(feature_vector, MoveOutOfBlastZone)
     action_to_safety = Actions.from_one_hot(action_to_safety)
-    action_to_box = feature_collector.single_feature_from_vector(
-        feature_vector, MoveNextToNearestBox)
+    action_to_box = feature_collector.single_feature_from_vector(feature_vector, MoveNextToNearestBox)
     action_to_box = Actions.from_one_hot(action_to_box)
-    action_to_enemy = feature_collector.single_feature_from_vector(
-        feature_vector, MoveToNearestEnemy)
+    action_to_enemy = feature_collector.single_feature_from_vector(feature_vector, MoveToNearestEnemy)
     action_to_enemy = Actions.from_one_hot(action_to_enemy)
-    blast_boxes = feature_collector.single_feature_from_vector(
-        feature_vector, BoxesInBlastRange)[0]
-    bomb_good = feature_collector.single_feature_from_vector(
-        feature_vector, CouldEscapeOwnBomb)[0]
-    blast_enemies = feature_collector.single_feature_from_vector(
-        feature_vector, EnemiesInBlastRange)[0]
-    possible_actions = feature_collector.single_feature_from_vector(
-        feature_vector, PossibleActions)
+    blast_boxes = feature_collector.single_feature_from_vector(feature_vector, BoxesInBlastRange)[0]
+    bomb_good = feature_collector.single_feature_from_vector(feature_vector, CouldEscapeOwnBomb)[0]
+    blast_enemies = feature_collector.single_feature_from_vector(feature_vector, EnemiesInBlastRange)[0]
+    possible_actions = feature_collector.single_feature_from_vector(feature_vector, PossibleActions)
     can_place_bomb = possible_actions[Actions.BOMB.value] == 1
     nearest_enemy_possible_moves = feature_collector.single_feature_from_vector(
-        feature_vector, NearestEnemyPossibleMoves)
-    enemy_distance = feature_collector.single_feature_from_vector(
-        feature_vector, EnemyDistance)[0]
-    coin_distance = feature_collector.single_feature_from_vector(
-        feature_vector, CoinDistance)[0]
+        feature_vector, NearestEnemyPossibleMoves
+    )
+    enemy_distance = feature_collector.single_feature_from_vector(feature_vector, EnemyDistance)[0]
+    coin_distance = feature_collector.single_feature_from_vector(feature_vector, CoinDistance)[0]
 
     local_rewards = 0
     global_rewards = 0
@@ -222,4 +282,5 @@ def _rewards_from_events(self, feature_vector, events, action):
             local_rewards += 10
     rewards = local_rewards + global_rewards
 
+    self.reward_history.append(rewards)
     return rewards
