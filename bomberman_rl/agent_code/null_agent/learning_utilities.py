@@ -30,6 +30,7 @@ ACTION_VALUE_DATA_PATH = "action_values.joblib"
 
 
 def setup_learning_features(self, load_model=True):
+    """Author: Jonas Gann"""
     self.EPSILON = EPSILON
     # Object where the experience of the agent is stored.
     # State-reward pairs are inserted into the action-object which resulted in the rewards.
@@ -59,6 +60,7 @@ def setup_learning_features(self, load_model=True):
 
 
 def update_action_value_data(self, old_game_state, self_action, new_game_state, events):
+    """Author: Jonas Gann"""
     """Use a transition to update the experience of the agent using q-learning."""
     # Compute features out of the old game state
     old_features = self.feature_collector.compute_feature(old_game_state, self)
@@ -80,6 +82,7 @@ def update_action_value_data(self, old_game_state, self_action, new_game_state, 
 
 
 def update_action_value_last_step(self, last_game_state, last_action, events):
+    """Author: Jonas Gann"""
     """Use a transition to update the experience of the agent using q-learning."""
     old_features = self.feature_collector.compute_feature(
         last_game_state, self)
@@ -93,6 +96,7 @@ def update_action_value_last_step(self, last_game_state, last_action, events):
 
 
 def train_q_model(self, game_state, episode_rounds, save_model=True):
+    """Author: Jonas Gann"""
     round = game_state["round"]
     if round % episode_rounds == 0:
         # Reduce epsilon by epsilon decrease rate
@@ -113,6 +117,7 @@ def train_q_model(self, game_state, episode_rounds, save_model=True):
 
 
 def _train_q_model(self, action_value_data):
+    """Author: Jonas Gann"""
     new_trees = {}
     for action in Actions:  # Train a new regression forest for each action
         if action == Actions.NONE:
@@ -146,6 +151,7 @@ def _train_q_model(self, action_value_data):
 
 
 def _rewards_from_events(self, feature_vector, events, action):
+    """Author: Jonas Gann"""
     action = Actions[action]
     feature_collector: FeatureCollector = self.feature_collector
     action_to_coin = feature_collector.single_feature_from_vector(

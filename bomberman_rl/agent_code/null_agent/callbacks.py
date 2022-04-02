@@ -20,6 +20,7 @@ class Actions(Enum):
 
 
 def setup(self):
+    """Author: Jonas Gann"""
     self.past_moves = []    # Maintain a list of past agent moves for usage as features
     # Create a feature extractor which is able to generate features from game states
     self.feature_collector = FeatureCollector.create_current_version()
@@ -30,6 +31,7 @@ def setup(self):
 
 
 def act(self, game_state: dict):
+    """Author: Jonas Gann"""
     if game_state["step"] == 1:
         self.past_moves = []    # Reset the list of past moves each new round
     # Randomly explore or exploit according to the probability of epsilon
@@ -40,6 +42,7 @@ def act(self, game_state: dict):
 
 
 def explore(self):
+    """Author: Jonas Gann"""
     choice = np.random.choice(
         list(Actions), p=[0.18, 0.18, 0.18, 0.18, 0.18, 0.1])   # Randomly perform an action
     self.past_moves.append(choice)  # Remember the performed action
@@ -47,6 +50,7 @@ def explore(self):
 
 
 def exploit(self, game_state):
+    """Author: Jonas Gann"""
     best_prediction = "WAIT"
     best_prediction_value = -math.inf
     # Generate features from the current game state

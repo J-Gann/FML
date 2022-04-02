@@ -18,6 +18,8 @@ import settings as s
 
 
 class Feature(metaclass=ABCMeta):
+    """Author: Samuel Melm"""
+
     def name(self):
         return camel_to_snake_case(type(self).__name__)
 
@@ -40,6 +42,8 @@ class Feature(metaclass=ABCMeta):
 
 
 class TwoDimensionalFeature(Feature):
+    """Author: Samuel Melm"""
+
     def dim(self) -> int:
         return 2
 
@@ -48,6 +52,8 @@ class TwoDimensionalFeature(Feature):
 
 
 class BooleanFeature(Feature):
+    """Author: Samuel Melm"""
+
     def dim(self) -> int:
         return 1
 
@@ -56,6 +62,8 @@ class BooleanFeature(Feature):
 
 
 class ActionFeature(Feature):
+    """Author: Samuel Melm"""
+
     def dim(self) -> int:
         return len(Actions) - 1  # since we dont consider NONE
 
@@ -64,22 +72,29 @@ class ActionFeature(Feature):
 
 
 class AgentPosition(TwoDimensionalFeature):
+    """Author: Samuel Melm"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         return np.array(get_agent_position(game_state))
 
 
 class BombDropPossible(BooleanFeature):
+    """Author: Samuel Melm"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         bomb_possible = game_state["self"][-2]
         return np.array([int(bomb_possible)])
 
 
 class MoveToNearestCoin(ActionFeature):
+    """Author: Samuel Melm"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         return self_obj.movement_graph.next_step_to_nearest_index(game_state["coins"]).as_one_hot()
 
 
 def move_out_of_blast_zone(game_state: dict, movement_graph: MovementGraph) -> Actions:
+    """Author: Jonas Gann"""
     agent_position = get_agent_position(game_state)
     free_indices = []
     blast_indices = movement_graph.blast_indices()
@@ -103,6 +118,8 @@ class MoveOutOfBlastZone(ActionFeature):
 
 
 class MoveNextToNearestBox(ActionFeature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         box_neighbors = []
         indices = np.argwhere(game_state["field"] == 1)
@@ -119,6 +136,8 @@ class MoveNextToNearestBox(ActionFeature):
 
 
 class MoveToNearestEnemy(ActionFeature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         enemy_indices = get_enemy_positions(game_state)
 
@@ -136,6 +155,8 @@ class MoveToNearestEnemy(ActionFeature):
 
 
 class EnemiesInBlastRange(Feature):
+    """Author: Jonas Gann"""
+
     def dim(self) -> int:
         return 1
 
@@ -170,6 +191,8 @@ class EnemiesInBlastRange(Feature):
 
 
 class PastMoves(Feature):
+    """Author: Jonas Gann"""
+
     def __init__(self, n=4) -> None:
         super().__init__()
         self.n = n
@@ -184,6 +207,8 @@ class PastMoves(Feature):
 
 
 class BoxesInBlastRange(Feature):
+    """Author: Jonas Gann"""
+
     def dim(self) -> int:
         return 1
 
@@ -216,6 +241,8 @@ class BoxesInBlastRange(Feature):
 
 
 class AgentInBlastZone(BooleanFeature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         in_blast_zone = to_node(get_agent_position(
             game_state)) in self_obj.movement_graph.blast_nodes()
@@ -223,6 +250,8 @@ class AgentInBlastZone(BooleanFeature):
 
 
 class PossibleActions(Feature):
+    """Author: Jonas Gann"""
+
     def dim(self) -> int:
         return len(Actions) - 1  # since we do not consider WAIT or NONE
 
@@ -243,6 +272,8 @@ class PossibleActions(Feature):
 
 
 class CouldEscapeOwnBomb(BooleanFeature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         old_bomb_indices = copy.deepcopy(self_obj.movement_graph.bomb_indices)
         self_obj.movement_graph.bomb_indices.append(
@@ -258,6 +289,8 @@ class CouldEscapeOwnBomb(BooleanFeature):
 
 
 class AgentFieldNeighbors(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         neighbors = []
         x, y = get_agent_position(game_state)
@@ -285,6 +318,8 @@ class AgentFieldNeighbors(Feature):
 
 
 class AgentExplosionNeighbors(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         neighbors = []
         x, y = get_agent_position(game_state)
@@ -315,6 +350,8 @@ class AgentExplosionNeighbors(Feature):
 
 
 class NearestEnemyPossibleMoves(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         enemy_indices = get_enemy_positions(game_state)
         nearest_index = self_obj.movement_graph.nearest_index(enemy_indices)
@@ -338,6 +375,8 @@ class NearestEnemyPossibleMoves(Feature):
 
 
 class CoinDistance(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         coin_indices = game_state["coins"]
         nearest_index = self_obj.movement_graph.nearest_index(coin_indices)
@@ -355,6 +394,8 @@ class CoinDistance(Feature):
 
 
 class BoxDistance(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         box_neighbors = []
         indices = np.argwhere(game_state["field"] == 1)
@@ -382,6 +423,8 @@ class BoxDistance(Feature):
 
 
 class EnemyDistance(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         enemy_indices = get_enemy_positions(game_state)
         enemy_neighbors = []
@@ -409,6 +452,8 @@ class EnemyDistance(Feature):
 
 
 class SafetyDistance(Feature):
+    """Author: Jonas Gann"""
+
     def compute_feature(self, game_state: dict, self_obj) -> np.array:
         agent_position = get_agent_position(game_state)
         free_indices = []
@@ -437,11 +482,10 @@ class SafetyDistance(Feature):
     def dim(self) -> int:
         return 1
 
-# - scores of enemies, own score
-# - total collected coins =? 9
-
 
 class FeatureCollector(Feature):
+    """Author: Samuel Melm"""
+
     def __init__(self, *features: List[Feature]):
         self.features: List[Feature] = features
 

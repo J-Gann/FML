@@ -9,23 +9,28 @@ COLS, ROWS = 17, 17
 
 
 def bomb_indices(game_state: dict) -> List[Tuple]:
+    """Author: Jonas Gann"""
     return [(bomb[0][0], bomb[0][1]) for bomb in game_state["bombs"]]
 
 
 def enemy_indices(game_state: dict) -> List[Tuple]:
+    """Author: Jonas Gann"""
     return [(other[3][0], other[3][1]) for other in game_state["others"]]
 
 
 def to_node(index):
+    """Author: Jonas Gann"""
     return index[1] * COLS + index[0]
 
 
 def to_index(node):
+    """Author: Jonas Gann"""
     return (node % COLS, math.floor(node / COLS))
 
 
 class MovementGraph:
     def __init__(self, game_state: dict) -> None:
+        """Author: Jonas Gann"""
         # Initialize some variables for easy access
         self.field = game_state["field"]
         self.explosion_map = game_state["explosion_map"]
@@ -60,16 +65,19 @@ class MovementGraph:
         self.matrix = csr_matrix((data, (row, col)))
 
     def is_within_field(self, x: int, y: int) -> bool:
+        """Author: Jonas Gann"""
         """Check if a coordinate is within the size of the field"""
         return 0 <= x < COLS and 0 <= y < ROWS
 
     def _node_obstructed(self, node):
+        """Author: Jonas Gann"""
         """Helper function to index_obstructed"""
         # Check if the field is obstructed at the node by wither a wall, a boy or an explosion
         x, y = to_index(node)
         return self._index_obstructed((x, y))
 
     def nearest_index(self, indices):
+        """Author: Jonas Gann"""
         """Helper function for nearest_node"""
         nodes = [to_node(index) for index in indices]
         nearest_node = self.nearest_node(nodes)
@@ -77,6 +85,7 @@ class MovementGraph:
             return to_index(nearest_node)
 
     def nearest_node(self, nodes):
+        """Author: Jonas Gann"""
         """Compute which of the passed nodes is the one nearest to the current agent position"""
         nodes = self.remove_obstructed_nodes(nodes)
         nodes = self.remove_nodes_out_of_range(nodes)
@@ -100,11 +109,13 @@ class MovementGraph:
             return None
 
     def nearest_distance_index(self, index):
+        """Author: Jonas Gann"""
         """Helper function for nearest_distance_node"""
         node = to_node(index)
         return self.nearest_distance_node(node)
 
     def nearest_distance_node(self, node):
+        """Author: Jonas Gann"""
         """Computes the distance to the nearest of the passed nodes"""
         if node == None:
             return None
@@ -127,6 +138,7 @@ class MovementGraph:
             return None
 
     def next_step_to_nearest_node(self, nodes):
+        """Author: Jonas Gann"""
         """Compute the next step which would move the agent towards the nearest of the passed nodes"""
         # Find the nearest reachable node in from the nodes array originating from the agent position and return the next move along the shortest path
         nodes = self.remove_obstructed_nodes(nodes)
@@ -162,6 +174,7 @@ class MovementGraph:
             return Actions.NONE
 
     def index_obstructed(self, index):
+        """Author: Jonas Gann"""
         """Check if the index is obstructed"""
         node = to_node(index)
         if node in self.obstructed:
@@ -170,6 +183,7 @@ class MovementGraph:
             return True
 
     def node_obstructed(self, node):
+        """Author: Jonas Gann"""
         """Check if the node is obstructed"""
         if node in self.obstructed:
             return self.obstructed[node]
@@ -177,6 +191,7 @@ class MovementGraph:
             return True
 
     def _index_obstructed(self, index):
+        """Author: Jonas Gann"""
         """Compute for a given game state which nodes are obstructed by e.g a wall"""
         # Check if the field is obstructed at the index by either a wall, a box, an explosion or an out of range error
         x, y = index
@@ -216,6 +231,7 @@ class MovementGraph:
         return is_wall or is_box or is_explosion or not in_range or is_bomb or is_explosion_in_next_step or is_enemy
 
     def _node_in_movement_range(self, node):
+        """Author: Jonas Gann"""
         """Validate if a node can be reached by any other node"""
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
         # These nodes are not added to the movement_graph during creation of the adjacency list.
@@ -223,11 +239,13 @@ class MovementGraph:
         return node < self.matrix.shape[0]
 
     def _index_in_movement_range(self, index):
+        """Author: Jonas Gann"""
         """Helper function for _node_in_movement_range"""
         node = to_node(index)
         return self._node_in_movement_range(node)
 
     def remove_obstructed_nodes(self, nodes):
+        """Author: Jonas Gann"""
         """Remove nodes which are obstructed"""
         free_nodes = []
         for node in nodes:
@@ -236,6 +254,7 @@ class MovementGraph:
         return free_nodes
 
     def remove_nodes_out_of_range(self, nodes):
+        """Author: Jonas Gann"""
         """Remove nodes which can not be reached by any other node"""
         # It can happen that NOT obstructed nodes exist which are not reachable through any edge.
         # These nodes are not added to the movement_graph during creation of the adjacency list.
@@ -247,11 +266,13 @@ class MovementGraph:
         return free_nodes
 
     def next_step_to_nearest_index(self, indices):
+        """Author: Jonas Gann"""
         """Helper function for next_step_to_nearest_node"""
         nodes = [to_node(index) for index in indices]
         return self.next_step_to_nearest_node(nodes)
 
     def blast_indices(self):
+        """Author: Jonas Gann"""
         """Compute which indices are currently under blast"""
         blast_indices = []
         for x, y in self.bomb_indices:
@@ -279,6 +300,7 @@ class MovementGraph:
         return blast_indices
 
     def blast_nodes(self):
+        """Author: Jonas Gann"""
         """Helper function for blast_indices"""
         blast_indices = self.blast_indices()
         return [to_node(index) for index in blast_indices]

@@ -8,6 +8,7 @@ from .learning_utilities import (
 
 
 def setup_training(self):
+    """Author: Jonas Gann"""
     # Some initialization for the regression models and learning algorithm. This loads an existing model from the filesystem when possible.
     setup_learning_features(self)
 
@@ -19,6 +20,7 @@ def game_events_occurred(
     new_game_state: dict,
     events: List[str],
 ):
+    """Author: Jonas Gann"""
     if old_game_state == None or self_action == None:
         return
     update_action_value_data(self, old_game_state,
@@ -26,6 +28,7 @@ def game_events_occurred(
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
+    """Author: Jonas Gann"""
     # Update the experience of the agent based on the transition
     update_action_value_last_step(self, last_game_state, last_action, events)
     # After each 5th round, train a new model for predicting the action values
