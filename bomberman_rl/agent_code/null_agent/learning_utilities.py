@@ -40,6 +40,9 @@ def setup_learning_features(self, load_model=True):
 
     # Load an existing model if possible
     if load_model and os.path.isfile(MODEL_PATH) and os.path.isfile(ACTION_VALUE_DATA_PATH):
+        # We used git-lfs to store models. Therefore in the model files, only a reference to
+        # a file store is included. To pull the actual file you have to install git-lfs:
+        # https://git-lfs.github.com/
         self.trees = load(MODEL_PATH)
         self.action_value_data = load(ACTION_VALUE_DATA_PATH)
     else:
